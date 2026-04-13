@@ -1,0 +1,18 @@
+[
+  {"id":"8930-1","name":"KATOOMBA","scale":25000,"minLon":150.0,"minLat":-33.75,"maxLon":150.25,"maxLat":-33.5},
+  {"id":"8930-2","name":"MOUNT WILSON","scale":25000,"minLon":150.25,"minLat":-33.75,"maxLon":150.5,"maxLat":-33.5},
+  {"id":"8930-3","name":"SPRINGWOOD","scale":25000,"minLon":150.0,"minLat":-34.0,"maxLon":150.25,"maxLat":-33.75},
+  {"id":"8930-4","name":"CAMDEN","scale":25000,"minLon":150.25,"minLat":-34.0,"maxLon":150.5,"maxLat":-33.75},
+  {"id":"8931-1","name":"LITHGOW","scale":25000,"minLon":150.0,"minLat":-33.5,"maxLon":150.25,"maxLat":-33.25},
+  {"id":"8931-3","name":"WALLERAWANG","scale":25000,"minLon":150.0,"minLat":-33.75,"maxLon":150.25,"maxLat":-33.5},
+  {"id":"9029-1","name":"WOLLONGONG","scale":25000,"minLon":150.75,"minLat":-34.5,"maxLon":151.0,"maxLat":-34.25},
+  {"id":"9030-1","name":"SYDNEY","scale":25000,"minLon":151.0,"minLat":-33.75,"maxLon":151.25,"maxLat":-33.5},
+  {"id":"9030-3","name":"BOTANY BAY","scale":25000,"minLon":151.0,"minLat":-34.0,"maxLon":151.25,"maxLat":-33.75},
+  {"id":"8525-1","name":"KOSCIUSZKO","scale":25000,"minLon":148.25,"minLat":-36.5,"maxLon":148.5,"maxLat":-36.25},
+  {"id":"8525-3","name":"KOSCIUSZKO SOUTH","scale":25000,"minLon":148.25,"minLat":-36.75,"maxLon":148.5,"maxLat":-36.5},
+  {"id":"8625-1","name":"JAGUNGAL","scale":25000,"minLon":148.5,"minLat":-36.0,"maxLon":148.75,"maxLat":-35.75},
+  {"id":"8726-1","name":"KIANDRA","scale":25000,"minLon":148.5,"minLat":-35.75,"maxLon":148.75,"maxLat":-35.5},
+  {"id":"8829-1","name":"KANANGRA","scale":25000,"minLon":150.0,"minLat":-34.0,"maxLon":150.25,"maxLat":-33.75},
+  {"id":"9131-1","name":"NEWCASTLE","scale":25000,"minLon":151.5,"minLat":-32.75,"maxLon":151.75,"maxLat":-32.5},
+  {"id":"9131-3","name":"CESSNOCK","scale":25000,"minLon":151.5,"minLat":-33.0,"maxLon":151.75,"maxLat":-32.75}
+]

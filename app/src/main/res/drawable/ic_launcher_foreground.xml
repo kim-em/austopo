@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Mountain shape -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M20,80 L40,35 L54,55 L65,40 L88,80 Z" />
+    <!-- Snow cap -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,50 L40,35 L45,50 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,50 L65,40 L72,50 Z" />
+    <!-- Contour lines -->
+    <path
+        android:strokeColor="#1B5E20"
+        android:strokeWidth="1"
+        android:pathData="M25,70 Q54,45 83,70"
+        android:fillColor="@android:color/transparent" />
+    <path
+        android:strokeColor="#1B5E20"
+        android:strokeWidth="1"
+        android:pathData="M30,75 Q54,55 78,75"
+        android:fillColor="@android:color/transparent" />
+</vector>
