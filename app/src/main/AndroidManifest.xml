@@ -28,5 +28,9 @@
         <activity
             android:name=".ui.CacheManagementActivity"
             android:screenOrientation="unspecified" />
+
+        <activity
+            android:name=".ui.OfflineRegionsActivity"
+            android:screenOrientation="unspecified" />
     </application>
 </manifest>

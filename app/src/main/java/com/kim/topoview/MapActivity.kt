@@ -15,15 +15,24 @@ import android.os.Environment
 import android.provider.Settings
 import android.widget.FrameLayout
 import android.widget.Toast
+import android.app.AlertDialog
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.widget.EditText
 import com.kim.topoview.data.MapSheet
 import com.kim.topoview.data.MapSheetRepository
 import com.kim.topoview.data.SheetStatus
+import com.kim.topoview.download.OfflineRegion
+import com.kim.topoview.download.OfflineRegionStore
+import com.kim.topoview.download.OfflineTileStore
 import com.kim.topoview.download.SheetDownloadManager
 import com.kim.topoview.download.TileFetcher
 import com.kim.topoview.index.NswIndexSyncer
 import com.kim.topoview.render.TileServerRenderer
 import com.kim.topoview.ui.CacheManagementActivity
 import com.kim.topoview.ui.DownloadDialog
+import com.kim.topoview.ui.OfflineRegionsActivity
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -35,6 +44,8 @@ class MapActivity : Activity(), LocationListener {
     private var hasNavigatedToGps = false
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var downloadManager: SheetDownloadManager
+    private lateinit var offlineTileStore: OfflineTileStore
+    private lateinit var offlineRegionStore: OfflineRegionStore
 
     // Default center: roughly SE Australia
     private val defaultLat = -33.8
@@ -46,11 +57,15 @@ class MapActivity : Activity(), LocationListener {
         repository = MapSheetRepository(this)
         mapView = TiledMapView(this)
         mapView.repository = repository
+        offlineTileStore = OfflineTileStore(this)
+        offlineRegionStore = OfflineRegionStore(this)
 
-        // Set up NSW tile server
-        val tileFetcher = TileFetcher(this)
-        tileFetcher.onTileLoaded = { mapView.invalidate() }
-        mapView.tileServerRenderer = TileServerRenderer(tileFetcher)
+        // Set up tile servers (NSW + Victoria)
+        for (fetcher in listOf(TileFetcher.nsw(this), TileFetcher.vic(this))) {
+            fetcher.onTileLoaded = { mapView.invalidate() }
+            fetcher.offlineStore = offlineTileStore
+            mapView.tileServerRenderers.add(TileServerRenderer(fetcher))
+        }
 
         // Set up download manager
         downloadManager = SheetDownloadManager(this)
@@ -76,6 +91,12 @@ class MapActivity : Activity(), LocationListener {
 
         // Handle tap on sheet rectangles
         mapView.onSheetTapped = { sheet -> onSheetTapped(sheet) }
+
+        // Handle region selection for offline save
+        mapView.onRegionSelected = { minMX, minMY, maxMX, maxMY ->
+            mapView.selectionMode = false
+            showSaveOfflineDialog(minMX, minMY, maxMX, maxMY)
+        }
 
         checkStoragePermission()
         loadSheets()
@@ -178,18 +199,38 @@ class MapActivity : Activity(), LocationListener {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, "Cache Management")
-        menu.add(0, 2, 0, "Sync NSW Index")
+        menu.add(0, 1, 0, "My Location")
+        menu.add(0, 5, 0, "Save Offline")
+        menu.add(0, 6, 0, "Offline Regions")
+        menu.add(0, 2, 0, "Cache Management")
+        menu.add(0, 3, 0, "Sync NSW Index")
+        menu.add(0, 4, 0, if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid")
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(4)?.title = if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid"
+        return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             1 -> {
-                startActivity(Intent(this, CacheManagementActivity::class.java))
+                val mx = mapView.gpsMX
+                val my = mapView.gpsMY
+                if (mx != null && my != null) {
+                    mapView.camera.setPosition(mx, my, maxOf(mapView.camera.zoom, 0.1f))
+                    mapView.invalidate()
+                } else {
+                    Toast.makeText(this, "No GPS fix yet", Toast.LENGTH_SHORT).show()
+                }
                 true
             }
             2 -> {
+                startActivity(Intent(this, CacheManagementActivity::class.java))
+                true
+            }
+            3 -> {
                 Toast.makeText(this, "Syncing NSW index...", Toast.LENGTH_SHORT).show()
                 val syncer = NswIndexSyncer(this)
                 scope.launch {
@@ -202,6 +243,22 @@ class MapActivity : Activity(), LocationListener {
                         Toast.makeText(this@MapActivity, "Sync failed", Toast.LENGTH_SHORT).show()
                     }
                 }
+                true
+            }
+            4 -> {
+                mapView.showSheetRectangles = !mapView.showSheetRectangles
+                mapView.invalidate()
+                invalidateOptionsMenu()
+                true
+            }
+            5 -> {
+                mapView.selectionMode = true
+                mapView.invalidate()
+                Toast.makeText(this, "Drag to select a region", Toast.LENGTH_LONG).show()
+                true
+            }
+            6 -> {
+                startActivity(Intent(this, OfflineRegionsActivity::class.java))
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -218,6 +275,112 @@ class MapActivity : Activity(), LocationListener {
                 repository.loadAll()
                 mapView.invalidate()
             }
+        }
+    }
+
+    // --- Offline region saving ---
+
+    private fun showSaveOfflineDialog(minMX: Double, minMY: Double, maxMX: Double, maxMY: Double) {
+        val currentMpp = mapView.camera.metersPerPixel()
+
+        // Get the actual fetcher references from the renderers
+        val activeFetchers = mapView.tileServerRenderers.mapNotNull { renderer ->
+            try {
+                val field = renderer.javaClass.getDeclaredField("tileFetcher")
+                field.isAccessible = true
+                field.get(renderer) as? TileFetcher
+            } catch (_: Exception) { null }
+        }
+
+        // Calculate tile counts for LOD range (current LOD ± 2)
+        val baseLod = activeFetchers.firstOrNull()?.bestLod(currentMpp) ?: 12
+        val lodMin = maxOf(6, baseLod - 2)
+        val lodMax = minOf(17, baseLod + 2)
+
+        var totalTiles = 0
+        for (fetcher in activeFetchers) {
+            if (maxMX > fetcher.extentMinX && minMX < fetcher.extentMaxX &&
+                maxMY > fetcher.extentMinY && minMY < fetcher.extentMaxY) {
+                val estimates = offlineTileStore.estimateTiles(fetcher, minMX, minMY, maxMX, maxMY, lodMin, lodMax)
+                totalTiles += estimates.sumOf { it.second }
+            }
+        }
+
+        val estSizeMB = totalTiles * 30 / 1024  // ~30KB per tile average
+
+        // Show dialog with name field
+        val nameInput = EditText(this).apply {
+            hint = "Region name"
+            setPadding(48, 32, 48, 16)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Save Offline Region")
+            .setView(nameInput)
+            .setMessage("LOD $lodMin–$lodMax\n~$totalTiles tiles (~${estSizeMB} MB)")
+            .setPositiveButton("Download") { _, _ ->
+                val name = nameInput.text.toString().ifBlank { "Region ${System.currentTimeMillis() / 1000}" }
+                startOfflineDownload(name, minMX, minMY, maxMX, maxMY, lodMin, lodMax, activeFetchers, totalTiles)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun startOfflineDownload(
+        name: String,
+        minMX: Double, minMY: Double, maxMX: Double, maxMY: Double,
+        lodMin: Int, lodMax: Int,
+        fetchers: List<TileFetcher>,
+        totalTiles: Int
+    ) {
+        Toast.makeText(this, "Downloading \"$name\"...", Toast.LENGTH_SHORT).show()
+
+        // Create notification channel
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel("offline_dl", "Offline Downloads", NotificationManager.IMPORTANCE_LOW)
+        nm.createNotificationChannel(channel)
+
+        for (fetcher in fetchers) {
+            if (maxMX <= fetcher.extentMinX || minMX >= fetcher.extentMaxX ||
+                maxMY <= fetcher.extentMinY || minMY >= fetcher.extentMaxY) continue
+
+            // Get the base URL via reflection since it's private
+            val baseUrl = try {
+                val field = fetcher.javaClass.getDeclaredField("baseUrl")
+                field.isAccessible = true
+                field.get(fetcher) as String
+            } catch (_: Exception) { continue }
+
+            offlineTileStore.onProgress = { downloaded, total ->
+                val notification = Notification.Builder(this, "offline_dl")
+                    .setContentTitle("Saving \"$name\"")
+                    .setContentText("$downloaded / $total tiles")
+                    .setSmallIcon(android.R.drawable.stat_sys_download)
+                    .setProgress(total, downloaded, false)
+                    .setOngoing(true)
+                    .build()
+                nm.notify(2001, notification)
+            }
+
+            offlineTileStore.onComplete = { success ->
+                nm.cancel(2001)
+                val msg = if (success) "\"$name\" saved for offline use" else "\"$name\" saved (some tiles failed)"
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+                // Save region metadata
+                offlineRegionStore.add(OfflineRegion(
+                    name = name,
+                    minMX = minMX, minMY = minMY, maxMX = maxMX, maxMY = maxMY,
+                    lodMin = lodMin, lodMax = lodMax,
+                    cacheName = fetcher.tileCacheName,
+                    tileCount = totalTiles
+                ))
+            }
+
+            offlineTileStore.downloadRegion(
+                fetcher, baseUrl, fetcher.tileCacheName,
+                minMX, minMY, maxMX, maxMY, lodMin, lodMax
+            )
         }
     }
 

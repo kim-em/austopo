@@ -17,15 +17,47 @@ class TiledMapView(context: Context) : View(context) {
     val camera = MapCamera(context) { invalidate() }
     private val localRenderer = LocalSheetRenderer()
     private val rectangleRenderer = SheetRectangleRenderer()
-    var tileServerRenderer: TileServerRenderer? = null
+    val tileServerRenderers = mutableListOf<TileServerRenderer>()
 
     var repository: MapSheetRepository? = null
     var onSheetTapped: ((MapSheet) -> Unit)? = null
+    var showSheetRectangles = true
+
+    // Region selection mode
+    var selectionMode = false
+    var onRegionSelected: ((minMX: Double, minMY: Double, maxMX: Double, maxMY: Double) -> Unit)? = null
+    private var selStartX = 0f
+    private var selStartY = 0f
+    private var selEndX = 0f
+    private var selEndY = 0f
+    private var selDragging = false
+    private val selFillPaint = Paint().apply {
+        color = Color.argb(40, 255, 165, 0) // orange fill
+        style = Paint.Style.FILL
+    }
+    private val selStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(200, 255, 165, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+    private val selLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 32f
+        textAlign = Paint.Align.CENTER
+        setShadowLayer(3f, 1f, 1f, Color.BLACK)
+    }
 
     // GPS position in Web Mercator (null if not available)
-    private var gpsMX: Double? = null
-    private var gpsMY: Double? = null
+    var gpsMX: Double? = null
+        private set
+    var gpsMY: Double? = null
+        private set
     private var gpsAccuracyMeters: Float = 0f
+
+    private val progressPaint = Paint().apply {
+        color = Color.argb(200, 76, 175, 80)  // green
+        style = Paint.Style.FILL
+    }
 
     private val gpsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLUE
@@ -47,6 +79,7 @@ class TiledMapView(context: Context) : View(context) {
     private val tapDetector = GestureDetector(context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (!showSheetRectangles) return false
                 repository ?: return false
                 val sheets = getVisibleSheets()
                 val hit = rectangleRenderer.hitTest(camera, e.x, e.y, sheets)
@@ -104,6 +137,45 @@ class TiledMapView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (selectionMode) {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    selStartX = event.x
+                    selStartY = event.y
+                    selEndX = event.x
+                    selEndY = event.y
+                    selDragging = true
+                    invalidate()
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (selDragging) {
+                        selEndX = event.x
+                        selEndY = event.y
+                        invalidate()
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (selDragging) {
+                        selDragging = false
+                        selEndX = event.x
+                        selEndY = event.y
+                        // Convert screen rect to world coordinates
+                        val x1 = camera.screenToWorldX(minOf(selStartX, selEndX))
+                        val x2 = camera.screenToWorldX(maxOf(selStartX, selEndX))
+                        val y1 = camera.screenToWorldY(maxOf(selStartY, selEndY)) // screen Y is inverted
+                        val y2 = camera.screenToWorldY(minOf(selStartY, selEndY))
+                        // Only fire if the selection is big enough (not just a tap)
+                        val screenW = Math.abs(selEndX - selStartX)
+                        val screenH = Math.abs(selEndY - selStartY)
+                        if (screenW > 50 && screenH > 50) {
+                            onRegionSelected?.invoke(x1, y1, x2, y2)
+                        }
+                        invalidate()
+                    }
+                }
+            }
+            return true
+        }
         tapDetector.onTouchEvent(event)
         return camera.onTouchEvent(event)
     }
@@ -111,20 +183,40 @@ class TiledMapView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(Color.DKGRAY)
 
-        // Draw tile server imagery (NSW)
-        tileServerRenderer?.draw(canvas, camera)
+        // Draw tile server imagery
+        for (renderer in tileServerRenderers) {
+            renderer.draw(canvas, camera)
+        }
 
         // Draw local sheet imagery
         localRenderer.draw(canvas, camera)
 
         // Draw sheet rectangles (index view)
-        val sheets = getVisibleSheets()
-        if (sheets.isNotEmpty()) {
-            rectangleRenderer.draw(canvas, camera, sheets)
+        if (showSheetRectangles) {
+            val sheets = getVisibleSheets()
+            if (sheets.isNotEmpty()) {
+                rectangleRenderer.draw(canvas, camera, sheets)
+            }
+        }
+
+        // Selection rectangle
+        if (selectionMode && (selDragging || selStartX != selEndX)) {
+            val left = minOf(selStartX, selEndX)
+            val top = minOf(selStartY, selEndY)
+            val right = maxOf(selStartX, selEndX)
+            val bottom = maxOf(selStartY, selEndY)
+            canvas.drawRect(left, top, right, bottom, selFillPaint)
+            canvas.drawRect(left, top, right, bottom, selStrokePaint)
+            canvas.drawText("Drag to select region", width / 2f, 60f, selLabelPaint)
+        } else if (selectionMode) {
+            canvas.drawText("Drag to select region", width / 2f, 60f, selLabelPaint)
         }
 
         // GPS overlay on top
         drawGpsOverlay(canvas)
+
+        // Tile loading progress bar
+        drawProgressBar(canvas)
     }
 
     private fun getVisibleSheets(): List<MapSheet> {
@@ -155,8 +247,23 @@ class TiledMapView(context: Context) : View(context) {
         canvas.drawCircle(screenX, screenY, 10f, gpsPaint)
     }
 
+    private fun drawProgressBar(canvas: Canvas) {
+        var total = 0
+        var loaded = 0
+        for (renderer in tileServerRenderers) {
+            total += renderer.tilesTotal
+            loaded += renderer.tilesLoaded
+        }
+        if (total == 0 || loaded >= total) return
+
+        val barHeight = 4f
+        val fraction = loaded.toFloat() / total
+        val barWidth = width * fraction
+        canvas.drawRect(0f, height - barHeight, barWidth, height.toFloat(), progressPaint)
+    }
+
     fun recycle() {
         localRenderer.recycle()
-        tileServerRenderer?.recycle()
+        tileServerRenderers.forEach { it.recycle() }
     }
 }

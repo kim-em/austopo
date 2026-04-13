@@ -5,19 +5,28 @@ import com.kim.topoview.MapCamera
 import com.kim.topoview.download.TileFetcher
 
 /**
- * Renders NSW topo map tiles from the ArcGIS tile server.
- * Snaps to discrete LOD levels and draws a grid of 256x256 tiles.
+ * Renders topo map tiles from an ArcGIS tile server.
+ * Uses LOD hysteresis to avoid thrashing and pins previously-visible tiles
+ * so they remain available as fallback during LOD transitions.
  */
 class TileServerRenderer(private val tileFetcher: TileFetcher) {
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    // Loading state from last draw
+    var tilesTotal = 0
+        private set
+    var tilesLoaded = 0
+        private set
+
+    // Current LOD for hysteresis
+    private var currentLod = -1
 
     fun draw(canvas: Canvas, camera: MapCamera) {
         if (camera.viewWidth == 0 || camera.viewHeight == 0) return
 
         val metersPerPixel = camera.metersPerPixel()
 
-        // Check if viewport overlaps NSW extent
         val halfW = camera.halfViewW()
         val halfH = camera.halfViewH()
         val viewMinX = camera.centerX - halfW
@@ -25,37 +34,191 @@ class TileServerRenderer(private val tileFetcher: TileFetcher) {
         val viewMinY = camera.centerY - halfH
         val viewMaxY = camera.centerY + halfH
 
-        if (viewMaxX < TileFetcher.NSW_MIN_X || viewMinX > TileFetcher.NSW_MAX_X ||
-            viewMaxY < TileFetcher.NSW_MIN_Y || viewMinY > TileFetcher.NSW_MAX_Y
-        ) return
+        if (viewMaxX < tileFetcher.extentMinX || viewMinX > tileFetcher.extentMaxX ||
+            viewMaxY < tileFetcher.extentMinY || viewMinY > tileFetcher.extentMaxY
+        ) {
+            tilesTotal = 0
+            tilesLoaded = 0
+            return
+        }
 
-        // Snap to best LOD
-        val lod = tileFetcher.bestLod(metersPerPixel)
-        // Don't render tiles when very zoomed out (index view territory)
-        if (lod < 6) return
+        // LOD with hysteresis to avoid threshold thrashing
+        val lod = tileFetcher.bestLodWithHysteresis(metersPerPixel, currentLod)
+        if (lod < tileFetcher.minLod) {
+            tilesTotal = 0
+            tilesLoaded = 0
+            return
+        }
 
-        // Find the tile range covering the viewport, clipped to NSW extent
-        val clippedMinX = maxOf(viewMinX, TileFetcher.NSW_MIN_X)
-        val clippedMaxX = minOf(viewMaxX, TileFetcher.NSW_MAX_X)
-        val clippedMinY = maxOf(viewMinY, TileFetcher.NSW_MIN_Y)
-        val clippedMaxY = minOf(viewMaxY, TileFetcher.NSW_MAX_Y)
+        val clippedMinX = maxOf(viewMinX, tileFetcher.extentMinX)
+        val clippedMaxX = minOf(viewMaxX, tileFetcher.extentMaxX)
+        val clippedMinY = maxOf(viewMinY, tileFetcher.extentMinY)
+        val clippedMaxY = minOf(viewMaxY, tileFetcher.extentMaxY)
 
-        val (minCol, maxRow) = tileFetcher.tileForMercator(clippedMinX, clippedMinY, lod)
-        val (maxCol, minRow) = tileFetcher.tileForMercator(clippedMaxX, clippedMaxY, lod)
+        var drawLod = lod
+        var minCol: Int
+        var maxCol: Int
+        var minRow: Int
+        var maxRow: Int
 
-        // Limit tile count to avoid excessive fetches
-        val colCount = maxCol - minCol + 1
-        val rowCount = maxRow - minRow + 1
-        if (colCount * rowCount > 100) return
+        // If tile count exceeds limit, step down to coarser LOD instead of blanking
+        while (drawLod >= tileFetcher.minLod) {
+            val (mc, mxr) = tileFetcher.tileForMercator(clippedMinX, clippedMinY, drawLod)
+            val (mxc, mr) = tileFetcher.tileForMercator(clippedMaxX, clippedMaxY, drawLod)
+            minCol = mc; maxCol = mxc; minRow = mr; maxRow = mxr
+            val count = (maxCol - minCol + 1) * (maxRow - minRow + 1)
+            if (count <= 100) {
+                // Draw at this LOD
+                val result = drawGrid(canvas, camera, drawLod, minCol, maxCol, minRow, maxRow)
+                tilesTotal = result.first
+                tilesLoaded = result.second
+
+                // If all tiles loaded at target LOD, update current and pin them
+                if (drawLod == lod && tilesLoaded == tilesTotal && tilesTotal > 0) {
+                    currentLod = lod
+                    pinCurrentTiles(lod, minCol, maxCol, minRow, maxRow)
+                } else if (currentLod < 0) {
+                    currentLod = lod
+                }
+
+                // Still request target LOD tiles if we drew at a coarser level
+                if (drawLod != lod) {
+                    requestTargetLod(lod, clippedMinX, clippedMaxX, clippedMinY, clippedMaxY)
+                }
+                return
+            }
+            drawLod--
+        }
+
+        // Couldn't find a LOD with <= 100 tiles
+        tilesTotal = 0
+        tilesLoaded = 0
+    }
+
+    private fun drawGrid(
+        canvas: Canvas, camera: MapCamera,
+        lod: Int, minCol: Int, maxCol: Int, minRow: Int, maxRow: Int
+    ): Pair<Int, Int> {
+        var total = 0
+        var loaded = 0
 
         for (row in minRow..maxRow) {
             for (col in minCol..maxCol) {
+                total++
                 val bitmap = tileFetcher.getTile(lod, col, row)
                 if (bitmap != null) {
+                    loaded++
                     drawTile(canvas, camera, bitmap, col, row, lod)
+                } else {
+                    drawFallbackTile(canvas, camera, col, row, lod)
                 }
-                // If bitmap is null, async fetch was started; onTileLoaded will trigger invalidate
             }
+        }
+
+        return Pair(total, loaded)
+    }
+
+    /** Request tiles at the target LOD (without drawing) so they load in background. */
+    private fun requestTargetLod(
+        lod: Int,
+        clippedMinX: Double, clippedMaxX: Double,
+        clippedMinY: Double, clippedMaxY: Double
+    ) {
+        val (minCol, maxRow) = tileFetcher.tileForMercator(clippedMinX, clippedMinY, lod)
+        val (maxCol, minRow) = tileFetcher.tileForMercator(clippedMaxX, clippedMaxY, lod)
+        val count = (maxCol - minCol + 1) * (maxRow - minRow + 1)
+        if (count > 100) return
+        for (row in minRow..maxRow) {
+            for (col in minCol..maxCol) {
+                tileFetcher.getTile(lod, col, row) // triggers async fetch
+            }
+        }
+    }
+
+    private fun pinCurrentTiles(
+        lod: Int, minCol: Int, maxCol: Int, minRow: Int, maxRow: Int
+    ) {
+        val keys = mutableSetOf<String>()
+        for (row in minRow..maxRow) {
+            for (col in minCol..maxCol) {
+                keys.add("$lod/$row/$col")
+            }
+        }
+        tileFetcher.pinTiles(keys)
+    }
+
+    private fun drawFallbackTile(
+        canvas: Canvas, camera: MapCamera,
+        col: Int, row: Int, lod: Int
+    ) {
+        // Try parent tiles first (zoom-in case: upscale)
+        for (fallbackLod in (lod - 1) downTo maxOf(tileFetcher.minLod, lod - 4)) {
+            val scale = lod - fallbackLod
+            val parentCol = col shr scale
+            val parentRow = row shr scale
+            val parentBitmap = tileFetcher.peekTile(fallbackLod, parentCol, parentRow) ?: continue
+
+            val divisor = 1 shl scale
+            val subCol = col - (parentCol shl scale)
+            val subRow = row - (parentRow shl scale)
+            val subSize = TileFetcher.TILE_SIZE / divisor
+
+            val srcLeft = subCol * subSize
+            val srcTop = subRow * subSize
+            val src = Rect(srcLeft, srcTop, srcLeft + subSize, srcTop + subSize)
+
+            val bounds = tileFetcher.tileBounds(col, row, lod)
+            val dst = RectF(
+                camera.worldToScreenX(bounds[0]),
+                camera.worldToScreenY(bounds[3]),
+                camera.worldToScreenX(bounds[2]),
+                camera.worldToScreenY(bounds[1])
+            )
+
+            canvas.drawBitmap(parentBitmap, src, dst, paint)
+            return
+        }
+
+        // Try child tiles (zoom-out case: downscale composited children)
+        for (childLod in (lod + 1)..minOf(lod + 3, TileFetcher.LOD_RESOLUTIONS.size - 1)) {
+            val scale = childLod - lod
+            val factor = 1 shl scale
+            val baseChildCol = col * factor
+            val baseChildRow = row * factor
+            var anyChild = false
+            for (cr in 0 until factor) {
+                for (cc in 0 until factor) {
+                    if (tileFetcher.peekTile(childLod, baseChildCol + cc, baseChildRow + cr) != null) {
+                        anyChild = true
+                        break
+                    }
+                }
+                if (anyChild) break
+            }
+            if (!anyChild) continue
+
+            val bounds = tileFetcher.tileBounds(col, row, lod)
+            val dstLeft = camera.worldToScreenX(bounds[0])
+            val dstTop = camera.worldToScreenY(bounds[3])
+            val dstRight = camera.worldToScreenX(bounds[2])
+            val dstBottom = camera.worldToScreenY(bounds[1])
+            val cellW = (dstRight - dstLeft) / factor
+            val cellH = (dstBottom - dstTop) / factor
+
+            val src = Rect(0, 0, TileFetcher.TILE_SIZE, TileFetcher.TILE_SIZE)
+            for (cr in 0 until factor) {
+                for (cc in 0 until factor) {
+                    val childBitmap = tileFetcher.peekTile(childLod, baseChildCol + cc, baseChildRow + cr) ?: continue
+                    val dst = RectF(
+                        dstLeft + cc * cellW,
+                        dstTop + cr * cellH,
+                        dstLeft + (cc + 1) * cellW,
+                        dstTop + (cr + 1) * cellH
+                    )
+                    canvas.drawBitmap(childBitmap, src, dst, paint)
+                }
+            }
+            return
         }
     }
 
@@ -64,12 +227,11 @@ class TileServerRenderer(private val tileFetcher: TileFetcher) {
         bitmap: Bitmap, col: Int, row: Int, lod: Int
     ) {
         val bounds = tileFetcher.tileBounds(col, row, lod)
-        // bounds: minX, minY, maxX, maxY
 
         val screenLeft = camera.worldToScreenX(bounds[0])
-        val screenTop = camera.worldToScreenY(bounds[3])  // maxY → top of screen
+        val screenTop = camera.worldToScreenY(bounds[3])
         val screenRight = camera.worldToScreenX(bounds[2])
-        val screenBottom = camera.worldToScreenY(bounds[1])  // minY → bottom of screen
+        val screenBottom = camera.worldToScreenY(bounds[1])
 
         val src = Rect(0, 0, bitmap.width, bitmap.height)
         val dst = RectF(screenLeft, screenTop, screenRight, screenBottom)
