@@ -28,7 +28,13 @@ class TileFetcher(
     val minLod: Int = 6,
     val maxLod: Int = 23,
     cacheName: String = "tiles",
-    private val urlFormat: UrlFormat = UrlFormat.ARCGIS_REST
+    private val urlFormat: UrlFormat = UrlFormat.ARCGIS_REST,
+    /**
+     * Whether offline-region downloads may pre-seed tiles from this server.
+     * False for OpenTopoMap (WA), whose operators forbid bulk pre-fetching —
+     * only tiles the user is actively viewing may be requested.
+     */
+    val bulkDownloadAllowed: Boolean = true
 ) {
 
     /**
@@ -169,13 +175,16 @@ class TileFetcher(
             extentMaxY = -1460000.0,   // ~-13°S (Kimberley)
             maxLod = 17,
             cacheName = "tiles_wa",
-            urlFormat = UrlFormat.XYZ_PNG
+            urlFormat = UrlFormat.XYZ_PNG,
+            // OpenTopoMap / OSM policy: only tiles actively being viewed.
+            bulkDownloadAllowed = false
         )
     }
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .addInterceptor(UserAgentInterceptor)
         .build()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())

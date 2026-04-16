@@ -34,13 +34,13 @@ Live tiles covering every Australian state and territory:
 
 - **NSW, VIC, QLD, SA, TAS** — each state's own ArcGIS REST topographic service.
 - **Northern Territory** — Geoscience Australia's [national Topographic Base Map](https://services.ga.gov.au/gis/rest/services/Topographic_Base_Map/MapServer), used for NT because no NT-specific topo tile server is published. © Commonwealth of Australia (Geoscience Australia), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- **Western Australia** — [OpenTopoMap](https://opentopomap.org/) (XYZ PNG, capped at zoom 17), used for WA because Landgate's basemap is paywalled through SLIP. Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) and SRTM; rendering © OpenTopoMap, [CC-BY-SA](https://creativecommons.org/licenses/by-sa/3.0/). Please respect [OpenTopoMap's usage policy](https://opentopomap.org/about) — it is a small volunteer-run service. AusTopo caches aggressively to minimise load.
+- **Western Australia** — [OpenTopoMap](https://opentopomap.org/) (XYZ PNG, capped at zoom 17), used for WA because Landgate's basemap is paywalled through SLIP. Attribution: *Kartendaten: © OpenStreetMap-Mitwirkende, SRTM | Kartendarstellung: © OpenTopoMap ([CC-BY-SA](https://creativecommons.org/licenses/by-sa/3.0/))*. In keeping with [OpenTopoMap's usage policy](https://opentopomap.org/about) and the underlying [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/), WA coverage is **live-view only**: the offline-region feature deliberately skips WA so that pre-emptive bulk fetching never hits OpenTopoMap. Requests identify themselves with a descriptive `User-Agent` (`AusTopo/<version> (+repo URL)`).
 
 Each tile source's extent is clipped to its region so cross-boundary pans don't generate 404s. Web Mercator LOD selection uses hysteresis to avoid flicker at zoom thresholds, and the last visible LOD is pinned in the in-memory LRU so it stays as a fallback during transitions.
 
 ## Offline regions
 
-Drag-select a bounding box on the map and pin every tile inside it (across all relevant LODs and all states that cover it) into a separate pinned store. Pinned tiles are never evicted. The Regions activity lists saved regions, shows download progress, and lets you delete them.
+Drag-select a bounding box on the map and pin every tile inside it (across all relevant LODs and all states that cover it) into a separate pinned store. Pinned tiles are never evicted. The Regions activity lists saved regions, shows download progress, and lets you delete them. Selections that include WA show a notice and WA tiles are excluded from the plan — see *Tile servers* above.
 
 ## Cache control
 

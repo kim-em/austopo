@@ -136,6 +136,26 @@ class OfflineRegionDownloaderPlanningTest {
             plan.tiles.size < unclippedCount)
     }
 
+    @Test fun `fetcher with bulkDownloadAllowed=false is skipped even when it overlaps`() {
+        // Emulates the WA / OpenTopoMap configuration: extent overlaps the
+        // selection, but bulk pre-fetching is prohibited, so planning must
+        // drop it entirely.
+        val openTopo = TileFetcher(
+            baseUrl = "https://test.invalid/xyz",
+            extentMinX = 15_500_000.0, extentMaxX = 16_000_000.0,
+            extentMinY = -4_500_000.0, extentMaxY = -4_000_000.0,
+            cacheName = "tiles_wa_fake",
+            bulkDownloadAllowed = false
+        )
+        val plans = downloader.planWork(
+            minMX = 15_500_000.0, minMY = -4_500_000.0,
+            maxMX = 16_000_000.0, maxMY = -4_000_000.0,
+            lodMin = 10, lodMax = 10,
+            fetcherEntries = listOf(OfflineRegionDownloader.Entry(openTopo))
+        )
+        assertEquals(0, plans.size)
+    }
+
     /** Minimal Context stub for OfflineRegionStore, which only needs filesDir. */
     private class FakeContext(private val dir: File) : android.content.ContextWrapper(null) {
         override fun getFilesDir(): File = dir

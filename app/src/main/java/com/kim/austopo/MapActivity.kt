@@ -379,15 +379,30 @@ class MapActivity : Activity(), LocationListener {
         val currentMpp = mapView.camera.metersPerPixel()
 
         // Fetchers whose extent intersects the selection.
-        val activeFetchers = mapView.tileServerRenderers
+        val intersecting = mapView.tileServerRenderers
             .map { it.tileFetcher }
             .filter {
                 maxMX > it.extentMinX && minMX < it.extentMaxX &&
                     maxMY > it.extentMinY && minMY < it.extentMaxY
             }
 
+        // Some servers (OpenTopoMap for WA) forbid bulk downloading. They're
+        // live-view only — exclude them from the download plan but still warn
+        // the user if their selection touched that region.
+        val activeFetchers = intersecting.filter { it.bulkDownloadAllowed }
+        val excluded = intersecting.filter { !it.bulkDownloadAllowed }
+
+        if (activeFetchers.isEmpty()) {
+            val msg = if (excluded.isNotEmpty())
+                "Offline download is not permitted for this region's tile server (OpenTopoMap)."
+            else
+                "Region is outside any tile server extent."
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            return
+        }
+
         // LOD range (current LOD ± 2)
-        val baseLod = activeFetchers.firstOrNull()?.bestLod(currentMpp) ?: 12
+        val baseLod = activeFetchers.first().bestLod(currentMpp)
         val lodMin = maxOf(6, baseLod - 2)
         val lodMax = minOf(17, baseLod + 2)
 
@@ -400,10 +415,19 @@ class MapActivity : Activity(), LocationListener {
             setPadding(48, 32, 48, 16)
         }
 
+        val message = buildString {
+            append("LOD ").append(lodMin).append('–').append(lodMax)
+            append("\n~").append(totalTiles).append(" tiles (~").append(estSizeMB).append(" MB)")
+            if (excluded.isNotEmpty()) {
+                append("\n\nNote: WA (OpenTopoMap) tiles are excluded — ")
+                append("that server does not permit bulk download.")
+            }
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Save Offline Region")
             .setView(nameInput)
-            .setMessage("LOD $lodMin–$lodMax\n~$totalTiles tiles (~${estSizeMB} MB)")
+            .setMessage(message)
             .setPositiveButton("Download") { _, _ ->
                 val name = nameInput.text.toString()
                     .ifBlank { "Region ${System.currentTimeMillis() / 1000}" }
