@@ -96,7 +96,8 @@ class MapActivity : Activity(), LocationListener {
         // Set up tile servers for all supported states
         for (fetcher in listOf(
             TileFetcher.nsw(), TileFetcher.vic(),
-            TileFetcher.qld(), TileFetcher.sa(), TileFetcher.tas()
+            TileFetcher.qld(), TileFetcher.sa(), TileFetcher.tas(),
+            TileFetcher.nt(), TileFetcher.wa()
         )) {
             fetcher.onTileLoaded = { mapView.invalidate() }
             fetcher.storage = storage
@@ -417,7 +418,7 @@ class MapActivity : Activity(), LocationListener {
         val channel = NotificationChannel("offline_dl", "Offline Downloads", NotificationManager.IMPORTANCE_LOW)
         nm.createNotificationChannel(channel)
 
-        val entries = fetchers.map { OfflineRegionDownloader.Entry(it, it.baseUrl) }
+        val entries = fetchers.map { OfflineRegionDownloader.Entry(it) }
 
         offlineDownloader.download(
             name, minMX, minMY, maxMX, maxMY, lodMin, lodMax, entries,

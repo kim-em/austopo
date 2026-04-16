@@ -124,7 +124,7 @@ class OfflineRegionDownloader(
 
     private suspend fun fetchAndSave(entry: Entry, coord: TileCoverage.TileCoord): Boolean {
         return try {
-            val url = "${entry.baseUrl}/${coord.lod}/${coord.row}/${coord.col}"
+            val url = entry.fetcher.tileUrl(coord.lod, coord.col, coord.row)
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val ok = response.isSuccessful
@@ -150,7 +150,7 @@ class OfflineRegionDownloader(
         scope.cancel()
     }
 
-    data class Entry(val fetcher: TileFetcher, val baseUrl: String)
+    data class Entry(val fetcher: TileFetcher)
 
     interface Listener {
         fun onProgress(done: Int, total: Int)

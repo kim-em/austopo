@@ -58,8 +58,8 @@ class OfflineRegionDownloaderPlanningTest {
             maxMX = 16_500_000.0, maxMY = -4_000_000.0,
             lodMin = lod, lodMax = lod,
             fetcherEntries = listOf(
-                OfflineRegionDownloader.Entry(west, west.baseUrl),
-                OfflineRegionDownloader.Entry(east, east.baseUrl)
+                OfflineRegionDownloader.Entry(west),
+                OfflineRegionDownloader.Entry(east)
             )
         )
 
@@ -104,7 +104,7 @@ class OfflineRegionDownloaderPlanningTest {
             minMX = 15_000_000.0, minMY = -4_500_000.0,
             maxMX = 16_500_000.0, maxMY = -4_000_000.0,
             lodMin = 10, lodMax = 10,
-            fetcherEntries = listOf(OfflineRegionDownloader.Entry(far, far.baseUrl))
+            fetcherEntries = listOf(OfflineRegionDownloader.Entry(far))
         )
         assertEquals(0, plans.size)
     }
@@ -118,7 +118,7 @@ class OfflineRegionDownloaderPlanningTest {
             minMX = 15_000_000.0, minMY = -4_500_000.0,
             maxMX = 17_000_000.0, maxMY = -4_300_000.0,
             lodMin = 10, lodMax = 10,
-            fetcherEntries = listOf(OfflineRegionDownloader.Entry(fetcher, fetcher.baseUrl))
+            fetcherEntries = listOf(OfflineRegionDownloader.Entry(fetcher))
         )
         assertEquals(1, plans.size)
         val plan = plans.single()
