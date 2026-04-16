@@ -1,0 +1,58 @@
+name: Release AAB
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      # If the AUSTOPO_KEYSTORE_BASE64 secret is set, decode it to a file and
+      # pass its path + passwords through to gradle via project properties.
+      # If it isn't, the release build falls back to the debug keystore (see
+      # app/build.gradle.kts) — useful for dry runs but not Play-uploadable.
+      - name: Decode upload keystore
+        if: env.HAVE_KEYSTORE == 'true'
+        env:
+          HAVE_KEYSTORE: ${{ secrets.AUSTOPO_KEYSTORE_BASE64 != '' }}
+          AUSTOPO_KEYSTORE_BASE64: ${{ secrets.AUSTOPO_KEYSTORE_BASE64 }}
+        run: |
+          echo "$AUSTOPO_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          echo "AUSTOPO_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      - name: Build release AAB
+        env:
+          AUSTOPO_KEYSTORE_PASSWORD: ${{ secrets.AUSTOPO_KEYSTORE_PASSWORD }}
+          AUSTOPO_KEY_ALIAS: ${{ secrets.AUSTOPO_KEY_ALIAS }}
+          AUSTOPO_KEY_PASSWORD: ${{ secrets.AUSTOPO_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release.aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
