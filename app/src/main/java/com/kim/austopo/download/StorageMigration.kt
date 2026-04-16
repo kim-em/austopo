@@ -60,8 +60,15 @@ object StorageMigration {
                 moveTree(child, target)
             } else {
                 target.parentFile?.mkdirs()
+                if (target.exists()) {
+                    // Pinned content wins — a legacy file is always at least
+                    // as old as whatever the user already has in the pinned
+                    // store. Delete the legacy copy and move on.
+                    child.delete()
+                    continue
+                }
                 if (!child.renameTo(target)) {
-                    child.copyTo(target, overwrite = true)
+                    child.copyTo(target, overwrite = false)
                     child.delete()
                 }
             }

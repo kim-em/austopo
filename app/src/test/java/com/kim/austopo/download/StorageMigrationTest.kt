@@ -75,4 +75,26 @@ class StorageMigrationTest {
         assertTrue(File(tempDir, "${StorageManager.PINNED_DIR}/tiles_nsw/14/9000/14001.png").exists())
         assertFalse(File(tempDir, StorageManager.LEGACY_OFFLINE_DIR).exists())
     }
+
+    @Test fun `merge never overwrites an existing pinned file`() {
+        // Pre-populate pinned with the user's existing (newer) content.
+        val pinned = File(tempDir, StorageManager.PINNED_DIR)
+        val pinnedBytes = byteArrayOf(7, 7, 7, 7)
+        val pinnedFile = File(pinned, "tiles_nsw/14/9000/14000.png").apply {
+            parentFile?.mkdirs()
+            writeBytes(pinnedBytes)
+        }
+        // Legacy dir has the same path with different (older) bytes.
+        val result = seedLegacy(
+            mapOf(
+                "tiles_nsw/14/9000/14000.png" to byteArrayOf(1, 2, 3)
+            )
+        )
+        assertEquals(StorageMigration.MigrationResult.Merged, result)
+        // The pinned file must retain its original bytes; the legacy bytes must NOT overwrite.
+        assertTrue(pinnedFile.exists())
+        assertEquals(pinnedBytes.size.toLong(), pinnedFile.length())
+        assertTrue("pinned bytes should be preserved", pinnedFile.readBytes().contentEquals(pinnedBytes))
+        assertFalse("legacy dir should be gone", File(tempDir, StorageManager.LEGACY_OFFLINE_DIR).exists())
+    }
 }

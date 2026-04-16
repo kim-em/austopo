@@ -25,7 +25,7 @@ class OfflineRegionsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val storage = StorageManager(this)
+        val storage = StorageManager.get(this)
         regionStore = OfflineRegionStore(this, storage)
         pinnedStore = PinnedTileStore(storage)
 

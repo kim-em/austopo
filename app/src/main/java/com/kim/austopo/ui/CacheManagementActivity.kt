@@ -37,7 +37,7 @@ class CacheManagementActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        storage = StorageManager(this)
+        storage = StorageManager.get(this)
         pinnedStore = PinnedTileStore(storage)
         transientStore = TransientTileStore(storage)
         repository = MapSheetRepository(this)

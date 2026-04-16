@@ -81,7 +81,7 @@ class MapActivity : Activity(), LocationListener {
         // Migrate the legacy offline_tiles/ dir on first launch after upgrade.
         StorageMigration.migrateIfNeeded(this)
 
-        storage = StorageManager(this)
+        storage = StorageManager.get(this)
         pinnedStore = PinnedTileStore(storage)
         transientStore = TransientTileStore(storage)
         offlineRegionStore = OfflineRegionStore(this, storage)

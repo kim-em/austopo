@@ -5,22 +5,26 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Single serialisation point for all app-managed disk writes:
  *   - PinnedTileStore (offline_tiles_pinned/)
  *   - TransientTileStore (offline_tiles_transient/)
  *   - OfflineRegionStore (offline_regions.json)
- *   - BookmarkStore (bookmarks.json, later)
+ *   - BookmarkStore (bookmarks.json)
  *
  * Writes go through `withLock` so concurrent coroutines can't interleave
  * file writes, directory walks, or read-modify-write JSON updates. Reads
  * are unlocked: once a file exists on disk it's immutable (we rewrite via
  * atomic rename), so readers can't observe a torn write.
+ *
+ * Instances are process-wide singletons keyed by canonical [filesDir] path
+ * — obtain one via [get]. Two activities asking for `StorageManager.get(ctx)`
+ * get the same instance and therefore share one mutex, which is the whole
+ * point of a "single serialisation point".
  */
 class StorageManager internal constructor(val filesDir: File) {
-
-    constructor(context: Context) : this(context.filesDir)
 
     private val mutex = Mutex()
 
@@ -71,5 +75,22 @@ class StorageManager internal constructor(val filesDir: File) {
         const val PINNED_DIR = "offline_tiles_pinned"
         const val TRANSIENT_DIR = "offline_tiles_transient"
         const val LEGACY_OFFLINE_DIR = "offline_tiles"
+
+        private val instances = ConcurrentHashMap<String, StorageManager>()
+
+        /**
+         * Returns the singleton [StorageManager] for this context's filesDir.
+         * Keyed by the canonical path so multiple activities share one
+         * instance (and therefore one mutex).
+         */
+        fun get(context: Context): StorageManager {
+            val key = context.filesDir.canonicalPath
+            return instances.getOrPut(key) { StorageManager(context.filesDir) }
+        }
+
+        /** For tests only: clear the cache so each test starts fresh. */
+        internal fun resetForTest() {
+            instances.clear()
+        }
     }
 }

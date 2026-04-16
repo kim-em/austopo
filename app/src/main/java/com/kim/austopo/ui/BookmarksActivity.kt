@@ -45,7 +45,7 @@ class BookmarksActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val storage = StorageManager(this)
+        val storage = StorageManager.get(this)
         store = BookmarkStore(this, storage)
 
         val root = LinearLayout(this).apply {
