@@ -154,8 +154,10 @@ class MapActivity : Activity(), LocationListener {
         loadSheets()
         syncNswIndexIfNeeded()
 
-        // Request GPS
-        requestLocationPermission()
+        // GPS is opt-in: we don't request the permission on launch (which would
+        // pop the OS dialog with no context, and breaches Play's prominent-
+        // disclosure policy). Instead, the user invokes it via the Loc button,
+        // which shows our own explanation first.
     }
 
     private fun loadSheets() {
@@ -260,13 +262,22 @@ class MapActivity : Activity(), LocationListener {
     }
 
     private fun actionMyLocation() {
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            showLocationDisclosure()
+            return
+        }
+        // Permission granted but we may not have started updates yet (e.g.
+        // first tap after a fresh launch where the user previously granted).
+        if (locationManager == null) startLocationUpdates()
+
         val mx = mapView.gpsMX
         val my = mapView.gpsMY
         if (mx != null && my != null) {
             mapView.camera.setPosition(mx, my, maxOf(mapView.camera.zoom, 0.1f))
             mapView.invalidate()
         } else {
-            Toast.makeText(this, "No GPS fix yet", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Acquiring GPS fix\u2026", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -447,14 +458,26 @@ class MapActivity : Activity(), LocationListener {
 
     // --- GPS ---
 
-    private fun requestLocationPermission() {
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 1)
-        } else {
-            startLocationUpdates()
-        }
+    /**
+     * Prominent in-app disclosure shown before the OS permission prompt, as
+     * required by Play's Location policy. Must be the user's first sight of
+     * any location-related dialog.
+     */
+    private fun showLocationDisclosure() {
+        AlertDialog.Builder(this)
+            .setTitle("Allow location access?")
+            .setMessage(
+                "AusTopo uses your device location to show where you are on the " +
+                "map and to centre the view when you tap Loc.\n\n" +
+                "Your location stays on this device. AusTopo does not share, " +
+                "transmit, or store your location anywhere off the phone."
+            )
+            .setPositiveButton("Continue") { _, _ ->
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 1)
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     override fun onRequestPermissionsResult(
