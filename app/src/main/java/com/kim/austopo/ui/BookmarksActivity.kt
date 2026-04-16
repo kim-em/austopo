@@ -34,6 +34,7 @@ class BookmarksActivity : Activity() {
     private lateinit var undoText: TextView
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var pendingUndo: Bookmark? = null
+    private var undoExpiresAtMs: Long = 0L
     private val undoHider = Runnable { hideUndoBar() }
 
     companion object {
@@ -41,6 +42,10 @@ class BookmarksActivity : Activity() {
         const val EXTRA_CURRENT_LON = "current_lon"
         const val EXTRA_RESULT_LAT = "result_lat"
         const val EXTRA_RESULT_LON = "result_lon"
+
+        private const val STATE_PENDING_UNDO = "pending_undo_json"
+        private const val STATE_UNDO_EXPIRES = "undo_expires_ms"
+        private const val UNDO_WINDOW_MS = 5_000L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,6 +125,31 @@ class BookmarksActivity : Activity() {
 
         setContentView(root)
         refresh()
+
+        // Restore any in-flight undo that was showing when rotation destroyed
+        // the previous instance. If the expiry has already passed, skip.
+        if (savedInstanceState != null) {
+            val json = savedInstanceState.getString(STATE_PENDING_UNDO)
+            val expiresAt = savedInstanceState.getLong(STATE_UNDO_EXPIRES, 0L)
+            val now = System.currentTimeMillis()
+            if (json != null && expiresAt > now) {
+                try {
+                    val b = Bookmark.fromJson(org.json.JSONObject(json))
+                    pendingUndo = b
+                    undoExpiresAtMs = expiresAt
+                    undoText.text = "Deleted \"${b.name}\""
+                    undoBar.visibility = View.VISIBLE
+                    undoBar.postDelayed(undoHider, expiresAt - now)
+                } catch (_: Exception) { /* fall through */ }
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val b = pendingUndo ?: return
+        outState.putString(STATE_PENDING_UNDO, b.toJson().toString())
+        outState.putLong(STATE_UNDO_EXPIRES, undoExpiresAtMs)
     }
 
     private fun refresh() {
@@ -215,14 +245,16 @@ class BookmarksActivity : Activity() {
 
     private fun showUndoBar(b: Bookmark) {
         pendingUndo = b
+        undoExpiresAtMs = System.currentTimeMillis() + UNDO_WINDOW_MS
         undoText.text = "Deleted \"${b.name}\""
         undoBar.visibility = View.VISIBLE
         undoBar.removeCallbacks(undoHider)
-        undoBar.postDelayed(undoHider, 5_000L)
+        undoBar.postDelayed(undoHider, UNDO_WINDOW_MS)
     }
 
     private fun hideUndoBar() {
         pendingUndo = null
+        undoExpiresAtMs = 0L
         undoBar.visibility = View.GONE
     }
 
@@ -246,6 +278,8 @@ class BookmarksActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Drop the orphaned message on the dead View's message queue.
+        if (::undoBar.isInitialized) undoBar.removeCallbacks(undoHider)
         scope.cancel()
     }
 
