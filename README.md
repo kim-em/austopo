@@ -81,9 +81,8 @@ Zone-explicit UTM/MGA conversions using the GRS80 ellipsoid via the Redfern seri
 
 - `INTERNET` — tile fetches.
 - `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — "Loc" button.
-- `FOREGROUND_SERVICE` — long-running offline-region downloads.
 
-No external storage permissions. No legacy storage. No "All files access" prompt.
+No external storage permissions. No legacy storage. No "All files access" prompt. No foreground-service permission. (Offline-region downloads currently run from a coroutine inside the map Activity, so they pause if you background the app — a future improvement is to move them to a dedicated foreground service of type `dataSync`, which would re-introduce that permission.)
 
 ## CI
 
