@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.kim.austopo.data.MapSheet
 import com.kim.austopo.data.MapSheetRepository
+import com.kim.austopo.render.AttributionRenderer
 import com.kim.austopo.render.GridRenderer
 import com.kim.austopo.render.LocalSheetRenderer
 import com.kim.austopo.render.ScaleBarRenderer
@@ -21,6 +22,7 @@ class TiledMapView(context: Context) : View(context) {
     private val rectangleRenderer = SheetRectangleRenderer()
     private val scaleBarRenderer = ScaleBarRenderer()
     private val gridRenderer = GridRenderer()
+    private val attributionRenderer = AttributionRenderer()
     var showKmGrid = false
     val tileServerRenderers = mutableListOf<TileServerRenderer>()
 
@@ -229,6 +231,9 @@ class TiledMapView(context: Context) : View(context) {
 
         // Scale bar (bottom-centre, above the progress bar so it isn't covered)
         scaleBarRenderer.draw(canvas, camera)
+
+        // Tile provider attribution (bottom-right, always visible)
+        attributionRenderer.draw(canvas, width, height)
 
         // Tile loading progress bar
         drawProgressBar(canvas)
