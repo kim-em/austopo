@@ -7,7 +7,9 @@ import android.view.MotionEvent
 import android.view.View
 import com.kim.austopo.data.MapSheet
 import com.kim.austopo.data.MapSheetRepository
+import com.kim.austopo.render.GridRenderer
 import com.kim.austopo.render.LocalSheetRenderer
+import com.kim.austopo.render.ScaleBarRenderer
 import com.kim.austopo.render.SheetRectangleRenderer
 import com.kim.austopo.render.TileServerRenderer
 import java.io.File
@@ -17,11 +19,16 @@ class TiledMapView(context: Context) : View(context) {
     val camera = MapCamera(context) { invalidate() }
     private val localRenderer = LocalSheetRenderer()
     private val rectangleRenderer = SheetRectangleRenderer()
+    private val scaleBarRenderer = ScaleBarRenderer()
+    private val gridRenderer = GridRenderer()
+    var showKmGrid = false
     val tileServerRenderers = mutableListOf<TileServerRenderer>()
 
     var repository: MapSheetRepository? = null
     var onSheetTapped: ((MapSheet) -> Unit)? = null
-    var showSheetRectangles = true
+    /** Fired on any confirmed single-tap (including taps that hit a sheet). */
+    var onMapTap: (() -> Unit)? = null
+    var showSheetRectangles = false
 
     // Region selection mode
     var selectionMode = false
@@ -75,19 +82,21 @@ class TiledMapView(context: Context) : View(context) {
         alpha = 30
     }
 
-    // Tap detection for sheet rectangles
+    // Tap detection for sheet rectangles and toolbar-restore
     private val tapDetector = GestureDetector(context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                if (!showSheetRectangles) return false
-                repository ?: return false
+                // Always notify — MapActivity restores the overlay toolbar on tap,
+                // regardless of whether a sheet was hit.
+                onMapTap?.invoke()
+                if (!showSheetRectangles) return true
+                repository ?: return true
                 val sheets = getVisibleSheets()
                 val hit = rectangleRenderer.hitTest(camera, e.x, e.y, sheets)
                 if (hit != null) {
                     onSheetTapped?.invoke(hit)
-                    return true
                 }
-                return false
+                return true
             }
         })
 
@@ -212,8 +221,14 @@ class TiledMapView(context: Context) : View(context) {
             canvas.drawText("Drag to select region", width / 2f, 60f, selLabelPaint)
         }
 
+        // 1 km MGA grid (drawn before GPS so the blue dot sits on top)
+        if (showKmGrid) gridRenderer.draw(canvas, camera)
+
         // GPS overlay on top
         drawGpsOverlay(canvas)
+
+        // Scale bar (bottom-centre, above the progress bar so it isn't covered)
+        scaleBarRenderer.draw(canvas, camera)
 
         // Tile loading progress bar
         drawProgressBar(canvas)

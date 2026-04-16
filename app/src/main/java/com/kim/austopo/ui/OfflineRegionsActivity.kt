@@ -6,20 +6,28 @@ import android.os.Bundle
 import android.widget.*
 import com.kim.austopo.download.OfflineRegion
 import com.kim.austopo.download.OfflineRegionStore
-import com.kim.austopo.download.OfflineTileStore
+import com.kim.austopo.download.PinnedTileStore
+import com.kim.austopo.download.StorageManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class OfflineRegionsActivity : Activity() {
 
     private lateinit var regionStore: OfflineRegionStore
-    private lateinit var tileStore: OfflineTileStore
+    private lateinit var pinnedStore: PinnedTileStore
     private lateinit var listLayout: LinearLayout
     private lateinit var totalSizeText: TextView
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        regionStore = OfflineRegionStore(this)
-        tileStore = OfflineTileStore(this)
+        val storage = StorageManager.get(this)
+        regionStore = OfflineRegionStore(this, storage)
+        pinnedStore = PinnedTileStore(storage)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -57,7 +65,7 @@ class OfflineRegionsActivity : Activity() {
         listLayout.removeAllViews()
 
         val regions = regionStore.load()
-        val totalSize = tileStore.totalSize()
+        val totalSize = pinnedStore.totalSize()
         totalSizeText.text = "Total offline: ${formatSize(totalSize)}"
 
         if (regions.isEmpty()) {
@@ -106,16 +114,21 @@ class OfflineRegionsActivity : Activity() {
     private fun confirmDelete(region: OfflineRegion) {
         AlertDialog.Builder(this)
             .setTitle("Delete \"${region.name}\"?")
-            .setMessage("This will remove the offline tiles for this region.")
+            .setMessage("This will remove the offline metadata for this region. " +
+                "Tiles shared with other regions are kept.")
             .setPositiveButton("Delete") { _, _ ->
-                // Remove tiles for this region's LOD range and bounds
-                regionStore.remove(region.name)
-                // Note: tiles are shared across regions so we only remove the metadata
-                // A full cleanup would need to check which tiles aren't used by other regions
-                refreshList()
+                scope.launch {
+                    regionStore.removeSuspending(region.name)
+                    refreshList()
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
     }
 
     private fun formatSize(bytes: Long): String {

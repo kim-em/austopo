@@ -9,7 +9,7 @@ import com.kim.austopo.download.TileFetcher
  * Uses LOD hysteresis to avoid thrashing and pins previously-visible tiles
  * so they remain available as fallback during LOD transitions.
  */
-class TileServerRenderer(private val tileFetcher: TileFetcher) {
+class TileServerRenderer(val tileFetcher: TileFetcher) {
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
