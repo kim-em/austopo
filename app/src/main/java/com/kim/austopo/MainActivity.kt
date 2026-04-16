@@ -2,18 +2,15 @@ package com.kim.austopo
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.Settings
 import android.widget.*
+import com.kim.austopo.util.MapsDir
 import java.io.File
 
 class MainActivity : Activity() {
 
     private val mapsDir: File
-        get() = File(Environment.getExternalStorageDirectory(), "TopoMaps")
+        get() = MapsDir.forContext(this)
 
     private lateinit var listView: ListView
     private lateinit var emptyText: TextView
@@ -85,32 +82,11 @@ class MainActivity : Activity() {
         }
 
         setContentView(layout)
-
-        checkStoragePermission()
     }
 
     override fun onResume() {
         super.onResume()
         loadMaps()
-    }
-
-    private fun checkStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                Toast.makeText(this,
-                    "Please grant file access to read maps",
-                    Toast.LENGTH_LONG).show()
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = Uri.parse("package:$packageName")
-                startActivity(intent)
-            }
-        } else {
-            if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 1)
-            }
-        }
     }
 
     private fun loadMaps() {

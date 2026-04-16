@@ -3,7 +3,6 @@ package com.kim.austopo.ui
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
-import android.os.Environment
 import android.view.View
 import android.widget.*
 import com.kim.austopo.MapActivity
@@ -12,6 +11,7 @@ import com.kim.austopo.data.SheetStatus
 import com.kim.austopo.download.PinnedTileStore
 import com.kim.austopo.download.StorageManager
 import com.kim.austopo.download.TransientTileStore
+import com.kim.austopo.util.MapsDir
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,7 +32,7 @@ class CacheManagementActivity : Activity() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val mapsDir: File
-        get() = File(Environment.getExternalStorageDirectory(), "TopoMaps")
+        get() = MapsDir.forContext(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

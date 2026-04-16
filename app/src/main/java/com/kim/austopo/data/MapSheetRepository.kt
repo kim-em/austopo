@@ -2,8 +2,8 @@ package com.kim.austopo.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Environment
 import com.kim.austopo.MapMetadata
+import com.kim.austopo.util.MapsDir
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -15,7 +15,7 @@ class MapSheetRepository(private val context: Context) {
         context.getSharedPreferences("austopo_sheets", Context.MODE_PRIVATE)
 
     private val mapsDir: File
-        get() = File(Environment.getExternalStorageDirectory(), "TopoMaps")
+        get() = MapsDir.forContext(context)
 
     fun getSheets(): List<MapSheet> = sheets
 

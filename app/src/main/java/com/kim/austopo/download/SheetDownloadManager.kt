@@ -4,9 +4,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Environment
 import com.kim.austopo.data.MapSheet
 import com.kim.austopo.data.SheetStatus
+import com.kim.austopo.util.MapsDir
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -32,7 +32,7 @@ class SheetDownloadManager(private val context: Context) {
         .build()
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val mapsDir = File(Environment.getExternalStorageDirectory(), "TopoMaps")
+    private val mapsDir = MapsDir.forContext(context)
 
     var onDownloadComplete: ((MapSheet, Boolean) -> Unit)? = null
     var onDownloadProgress: ((MapSheet, Int) -> Unit)? = null
