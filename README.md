@@ -88,3 +88,39 @@ No external storage permissions. No legacy storage. No "All files access" prompt
 ## CI
 
 GitHub Actions runs unit tests and builds a debug APK on every PR. Tests cover UTM conversions, tile coverage, storage migration, transient tile store, scale bar math, location parsers, storage manager singleton, offline region download planning, and the grid renderer.
+
+A separate `Release AAB` workflow runs on tag pushes (`v*`) and on manual dispatch, producing a signed `app-release.aab` for Play uploads. Signing keys come from GitHub Actions secrets (`AUSTOPO_KEYSTORE_BASE64`, `AUSTOPO_KEYSTORE_PASSWORD`, `AUSTOPO_KEY_ALIAS`, `AUSTOPO_KEY_PASSWORD`); if no keystore secret is set, the workflow falls back to the debug keystore (still produces an AAB, just not Play-uploadable).
+
+# Data sources & licences
+
+This is the canonical record of what each upstream provider permits. It exists for two reasons: (1) we are legally obliged to credit and respect each licence; (2) Google Play policy refuses apps that breach third-party terms, so this needs to be auditable before any store submission.
+
+Every entry is sourced from the provider's published terms — links given. Where a row says **email confirmation pending**, the published terms don't unambiguously cover third-party mobile apps and a direct enquiry is needed before promoting any AAB to Play production.
+
+| State | Endpoint | Licence | Status |
+| --- | --- | --- | --- |
+| NSW | maps.six.nsw.gov.au · `NSW_Topo_Map/MapServer` | [CC BY 4.0](https://www.spatial.nsw.gov.au/copyright) | ✅ confirmed |
+| VIC | emap.ffm.vic.gov.au · `mapscape_mercator/MapServer` | Vicmap data is generally [CC BY 4.0](https://www.land.vic.gov.au/) but the FFM-operated tile cache is not separately documented | ⚠ email confirmation pending |
+| QLD | spatial-gis.information.qld.gov.au · `QldMap_Topo/MapServer` | [CC BY 4.0](https://www.qld.gov.au/legal/copyright) (Queensland Government default) | ✅ confirmed (per default policy) |
+| SA | location.sa.gov.au · `Topographic_wmas/MapServer` | DataSA endorses CC BY 4.0 per dataset; this MapServer's specific licence statement is not separately published | ⚠ email confirmation pending |
+| TAS | services.thelist.tas.gov.au · `Basemaps/Topographic/MapServer` | theLIST publishes a copyright/disclaimer notice but no per-service CC declaration | ⚠ email confirmation pending |
+| NT, WA fallback | services.ga.gov.au · `Topographic_Base_Map/MapServer` | [CC BY 4.0](https://www.ga.gov.au/copyright) | ✅ confirmed |
+| WA (live tiles only) | OpenTopoMap (a/b/c.tile.opentopomap.org) | OSM data [ODbL](https://www.openstreetmap.org/copyright); rendering [CC BY-SA 3.0](https://opentopomap.org/about) | ⚠ usage-policy email pending |
+
+Required attribution strings (rendered in the bottom-right of the map view):
+
+- **NSW** — *© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW). For current information go to spatial.nsw.gov.au.*
+- **QLD** — *© State of Queensland*.
+- **GA** — *© Commonwealth of Australia (Geoscience Australia)*.
+- **OpenTopoMap (if WA stays on OTM)** — *Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)*.
+
+The current implementation renders a single shorter line listing every provider regardless of camera position; full per-provider attribution will need to expand into a tap-to-open dialog before Play submission.
+
+### Outstanding ToS work before Play production
+
+1. Email DEECA / Vicmap and Forest Fire Management Victoria asking whether the FFM-operated `emap.ffm.vic.gov.au` tile cache is covered by Vicmap's CC BY 4.0 stance, and confirm attribution wording.
+2. Email DataSA / DEW SA confirming the licence on `location.sa.gov.au` Topographic_wmas, and confirm app use is permitted.
+3. Email theLIST (DPIPWE) confirming licence and app use of `services.thelist.tas.gov.au` basemap tiles.
+4. If WA stays on OpenTopoMap, email Stefan Erhardt / OpenTopoMap describing AusTopo's caching, no-bulk-fetch, identifying-`User-Agent` posture, and ask for explicit blessing. (If declined, the WA fetcher should switch to Geoscience Australia — same licence as the NT fallback.)
+
+Replies should be filed under `docs/tos-correspondence/` (gitignored if they contain personal contact details).
