@@ -6,7 +6,9 @@ import android.os.Looper
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.ViewConfiguration
 import android.widget.OverScroller
+import kotlin.math.abs
 
 /**
  * Shared camera model in Web Mercator coordinates (meters).
@@ -34,12 +36,31 @@ class MapCamera(context: Context, private val invalidate: () -> Unit) {
     private val scroller = OverScroller(context)
     private val handler = Handler(Looper.getMainLooper())
 
+    /**
+     * Fires once per touch sequence the first time the user's finger moves past
+     * the platform touch slop, or starts a scale gesture. Used by
+     * [TiledMapView]/[MapActivity] to auto-hide the overlay toolbar.
+     */
+    var onInteractionStart: (() -> Unit)? = null
+
+    private val touchSlop: Int = ViewConfiguration.get(context).scaledTouchSlop
+    private var cumulativeScrollPx = 0f
+    private var interactionFired = false
+
     private val gestureDetector = GestureDetector(context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(
                 e1: MotionEvent?, e2: MotionEvent,
                 distanceX: Float, distanceY: Float
             ): Boolean {
+                // Fire interaction-start once we pass touch slop so that
+                // taps (which also produce tiny onScroll deltas) don't
+                // flash the overlay toolbar.
+                cumulativeScrollPx += abs(distanceX) + abs(distanceY)
+                if (!interactionFired && cumulativeScrollPx > touchSlop) {
+                    interactionFired = true
+                    onInteractionStart?.invoke()
+                }
                 // In Mercator, Y increases upward, but screen Y increases downward
                 centerX += distanceX / zoom
                 centerY -= distanceY / zoom
@@ -80,6 +101,8 @@ class MapCamera(context: Context, private val invalidate: () -> Unit) {
 
             override fun onDown(e: MotionEvent): Boolean {
                 scroller.forceFinished(true)
+                cumulativeScrollPx = 0f
+                interactionFired = false
                 return true
             }
         })
@@ -87,6 +110,10 @@ class MapCamera(context: Context, private val invalidate: () -> Unit) {
     private val scaleDetector = ScaleGestureDetector(context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (!interactionFired) {
+                    interactionFired = true
+                    onInteractionStart?.invoke()
+                }
                 val focusWorldX = screenToWorldX(detector.focusX)
                 val focusWorldY = screenToWorldY(detector.focusY)
 

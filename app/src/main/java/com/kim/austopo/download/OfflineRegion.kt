@@ -51,11 +51,15 @@ data class OfflineRegion(
 
 /**
  * Persists the list of saved offline regions.
+ *
+ * Read methods ([load]) are safe without the storage lock because writes go
+ * through [StorageManager.writeAtomic]. Mutation methods ([addSuspending],
+ * [removeSuspending]) serialise through [StorageManager.withLock] to prevent
+ * two concurrent downloads from clobbering each other's metadata.
  */
-class OfflineRegionStore(private val context: Context) {
+class OfflineRegionStore(context: Context, private val storage: StorageManager) {
 
-    private val file: File
-        get() = File(context.filesDir, "offline_regions.json")
+    private val file: File = File(context.filesDir, "offline_regions.json")
 
     fun load(): List<OfflineRegion> {
         if (!file.exists()) return emptyList()
@@ -67,20 +71,24 @@ class OfflineRegionStore(private val context: Context) {
         }
     }
 
-    fun save(regions: List<OfflineRegion>) {
+    private fun save(regions: List<OfflineRegion>) {
         val arr = JSONArray()
         regions.forEach { arr.put(it.toJson()) }
-        file.writeText(arr.toString())
+        storage.writeAtomic(file, arr.toString())
     }
 
-    fun add(region: OfflineRegion) {
-        val regions = load().toMutableList()
-        regions.add(region)
-        save(regions)
+    suspend fun addSuspending(region: OfflineRegion) {
+        storage.withLock {
+            val regions = load().toMutableList()
+            regions.add(region)
+            save(regions)
+        }
     }
 
-    fun remove(name: String) {
-        val regions = load().filter { it.name != name }
-        save(regions)
+    suspend fun removeSuspending(name: String) {
+        storage.withLock {
+            val regions = load().filter { it.name != name }
+            save(regions)
+        }
     }
 }

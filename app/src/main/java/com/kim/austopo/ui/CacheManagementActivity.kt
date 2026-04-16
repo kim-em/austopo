@@ -4,9 +4,19 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Environment
+import android.view.View
 import android.widget.*
+import com.kim.austopo.MapActivity
 import com.kim.austopo.data.MapSheetRepository
 import com.kim.austopo.data.SheetStatus
+import com.kim.austopo.download.PinnedTileStore
+import com.kim.austopo.download.StorageManager
+import com.kim.austopo.download.TransientTileStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.io.File
 
 class CacheManagementActivity : Activity() {
@@ -14,6 +24,12 @@ class CacheManagementActivity : Activity() {
     private lateinit var repository: MapSheetRepository
     private lateinit var listLayout: LinearLayout
     private lateinit var totalSizeText: TextView
+    private lateinit var tileUsageText: TextView
+
+    private lateinit var storage: StorageManager
+    private lateinit var pinnedStore: PinnedTileStore
+    private lateinit var transientStore: TransientTileStore
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val mapsDir: File
         get() = File(Environment.getExternalStorageDirectory(), "TopoMaps")
@@ -21,6 +37,9 @@ class CacheManagementActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        storage = StorageManager.get(this)
+        pinnedStore = PinnedTileStore(storage)
+        transientStore = TransientTileStore(storage)
         repository = MapSheetRepository(this)
         repository.loadAll()
 
@@ -33,6 +52,55 @@ class CacheManagementActivity : Activity() {
             text = "Cache Management"
             textSize = 24f
             setPadding(0, 16, 0, 16)
+        })
+
+        // -- Tile cache section --
+        root.addView(TextView(this).apply {
+            text = "Tile cache"
+            textSize = 18f
+            setPadding(0, 16, 0, 8)
+            setTextColor(0xFF4CAF50.toInt())
+        })
+
+        tileUsageText = TextView(this).apply {
+            textSize = 14f
+            setPadding(0, 0, 0, 8)
+        }
+        root.addView(tileUsageText)
+
+        val prefs = getSharedPreferences("austopo_sheets", MODE_PRIVATE)
+        val currentMb = prefs.getInt("cache_max_mb", MapActivity.DEFAULT_CACHE_MAX_MB)
+        val sliderLabel = TextView(this).apply {
+            text = "Max transient cache: $currentMb MB"
+            textSize = 14f
+        }
+        root.addView(sliderLabel)
+
+        root.addView(SeekBar(this).apply {
+            max = (MAX_CAP_MB - MIN_CAP_MB) / STEP_MB
+            progress = (currentMb.coerceIn(MIN_CAP_MB, MAX_CAP_MB) - MIN_CAP_MB) / STEP_MB
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar?, p: Int, fromUser: Boolean) {
+                    val mb = MIN_CAP_MB + p * STEP_MB
+                    sliderLabel.text = "Max transient cache: $mb MB"
+                    if (fromUser) prefs.edit().putInt("cache_max_mb", mb).apply()
+                }
+                override fun onStartTrackingTouch(bar: SeekBar?) {}
+                override fun onStopTrackingTouch(bar: SeekBar?) {}
+            })
+        })
+
+        root.addView(Button(this).apply {
+            text = "Clear transient cache now"
+            setOnClickListener { clearTransientCache() }
+        })
+
+        // -- Local sheets section --
+        root.addView(TextView(this).apply {
+            text = "Downloaded sheets"
+            textSize = 18f
+            setPadding(0, 24, 0, 8)
+            setTextColor(0xFF4CAF50.toInt())
         })
 
         totalSizeText = TextView(this).apply {
@@ -63,7 +131,27 @@ class CacheManagementActivity : Activity() {
         ))
 
         setContentView(root)
+        refreshTileUsage()
         refreshList()
+    }
+
+    private fun refreshTileUsage() {
+        scope.launch {
+            val transient = kotlinx.coroutines.withContext(Dispatchers.IO) { transientStore.totalSize() }
+            val pinned = kotlinx.coroutines.withContext(Dispatchers.IO) { pinnedStore.totalSize() }
+            tileUsageText.text = "Transient: ${formatSize(transient)} · " +
+                "Pinned (offline regions): ${formatSize(pinned)}"
+        }
+    }
+
+    private fun clearTransientCache() {
+        scope.launch {
+            storage.withLock {
+                transientStore.clearAll()
+            }
+            refreshTileUsage()
+            Toast.makeText(this@CacheManagementActivity, "Transient cache cleared", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun refreshList() {
@@ -226,5 +314,16 @@ class CacheManagementActivity : Activity() {
             bytes < 1024 * 1024 -> "${bytes / 1024} KB"
             else -> "${bytes / (1024 * 1024)} MB"
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
+
+    companion object {
+        private const val MIN_CAP_MB = 50
+        private const val MAX_CAP_MB = 2000
+        private const val STEP_MB = 50
     }
 }
