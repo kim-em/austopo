@@ -54,9 +54,15 @@ object Utm {
     /**
      * Zone for a longitude, if the point lies inside a 6° band. Use this only
      * when you already know the point is comfortably inside a zone's band.
+     *
+     * Returns `null` for longitudes outside the [-180°, 180°) range (the
+     * antimeridian `180.0` itself maps to zone 1 of the next revolution,
+     * not a real UTM zone).
      */
-    fun mgaZoneForLongitude(lonDeg: Double): Int =
-        ((lonDeg + 180.0) / 6.0).toInt() + 1
+    fun mgaZoneForLongitude(lonDeg: Double): Int? {
+        if (lonDeg < -180.0 || lonDeg >= 180.0) return null
+        return ((lonDeg + 180.0) / 6.0).toInt() + 1
+    }
 
     /**
      * Forward projection: WGS84 (lat, lon in degrees) → MGA (easting, northing in metres).

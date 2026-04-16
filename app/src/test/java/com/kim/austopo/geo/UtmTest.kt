@@ -25,6 +25,17 @@ class UtmTest {
         assertEquals(56, Utm.mgaZoneForLongitude(151.0))
     }
 
+    @Test fun `zone for lon at boundaries`() {
+        assertEquals(1, Utm.mgaZoneForLongitude(-180.0))
+        assertEquals(60, Utm.mgaZoneForLongitude(179.999))
+    }
+
+    @Test fun `zone for out-of-range lon is null`() {
+        assertEquals(null, Utm.mgaZoneForLongitude(180.0))
+        assertEquals(null, Utm.mgaZoneForLongitude(-180.01))
+        assertEquals(null, Utm.mgaZoneForLongitude(181.0))
+    }
+
     @Test fun `roundtrip on central meridian at equator has zero easting offset`() {
         // Lambda = lambda0 on the equator: easting should be exactly the false easting (500000).
         val (e, n) = Utm.wgs84ToMga(0.0, 147.0, 55)
