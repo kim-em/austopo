@@ -6,23 +6,28 @@ import android.graphics.Paint
 import android.graphics.RectF
 
 /**
- * Permanent bottom-right credit line for the upstream tile providers. Required
- * by the CC-BY licences our state and Commonwealth tile sources publish under,
- * and a baseline expectation of any map UI built on third-party tiles.
- *
- * The text never changes (we always credit every provider, regardless of which
- * region the camera is looking at) — keeps the geometry stable, and avoids the
- * footgun of crediting only the one server whose tiles happen to be visible.
+ * Bottom-right credit line for the tile providers currently visible in the
+ * viewport. Updates dynamically based on which [TileServerRenderer]s have
+ * tiles overlapping the camera (tilesTotal > 0).
  */
 class AttributionRenderer {
 
-    private val text =
-        "\u00a9 NSW Spatial Services \u2022 Vicmap \u2022 QSpatial \u2022 " +
-        "DEW SA \u2022 theLIST \u2022 Geoscience Australia (CC BY)"
+    companion object {
+        /** Map from TileFetcher.tileCacheName to the display credit. */
+        private val CREDITS = mapOf(
+            "tiles_nsw" to "NSW Spatial Services",
+            "tiles_vic" to "Vicmap",
+            "tiles_qld" to "QSpatial",
+            "tiles_sa"  to "DEW SA",
+            "tiles_tas" to "theLIST",
+            "tiles_nt"  to "Geoscience Australia",
+            "tiles_wa"  to "Geoscience Australia",
+        )
+    }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 22f
+        textSize = 20f
         textAlign = Paint.Align.RIGHT
     }
     private val bgPaint = Paint().apply {
@@ -31,8 +36,20 @@ class AttributionRenderer {
     }
     private val bgRect = RectF()
 
-    fun draw(canvas: Canvas, viewWidth: Int, viewHeight: Int) {
+    /**
+     * @param visibleCacheNames the set of [TileFetcher.tileCacheName] values
+     *        for renderers whose tilesTotal > 0 on the last draw pass.
+     */
+    fun draw(canvas: Canvas, viewWidth: Int, viewHeight: Int,
+             visibleCacheNames: Set<String>) {
         if (viewWidth == 0 || viewHeight == 0) return
+
+        val credits = visibleCacheNames
+            .mapNotNull { CREDITS[it] }
+            .distinct()
+        if (credits.isEmpty()) return
+
+        val text = "\u00a9 " + credits.joinToString(" \u2022 ")
         val padX = 12f
         val padY = 6f
         val textWidth = textPaint.measureText(text)

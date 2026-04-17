@@ -547,10 +547,14 @@ class MapActivity : Activity(), LocationListener {
     // --- Title bar + hamburger menu ---
 
     private fun buildTitleBar(): LinearLayout {
+        // Push the bar below the Android status bar (battery/wifi/clock)
+        val statusBarHeight = resources.getDimensionPixelSize(
+            resources.getIdentifier("status_bar_height", "dimen", "android"))
+                .coerceAtLeast(48)
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xC0222222.toInt())
-            setPadding(16, 12, 8, 12)
+            setPadding(16, statusBarHeight + 8, 8, 12)
             gravity = Gravity.CENTER_VERTICAL
         }
         val title = TextView(this).apply {

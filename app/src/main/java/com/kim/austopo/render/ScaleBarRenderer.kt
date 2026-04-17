@@ -56,7 +56,7 @@ class ScaleBarRenderer {
 
         val barPixels = (chosenMeters / metersPerPixel).toFloat()
         val barH = 10f
-        val margin = 28f
+        val margin = 60f  // clear the attribution line at the very bottom
         val cx = camera.viewWidth / 2f
         val left = cx - barPixels / 2f
         val right = cx + barPixels / 2f

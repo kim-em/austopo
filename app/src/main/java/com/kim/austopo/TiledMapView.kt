@@ -232,8 +232,14 @@ class TiledMapView(context: Context) : View(context) {
         // Scale bar (bottom-centre, above the progress bar so it isn't covered)
         scaleBarRenderer.draw(canvas, camera)
 
-        // Tile provider attribution (bottom-right, always visible)
-        attributionRenderer.draw(canvas, width, height)
+        // Tile provider attribution (bottom-right, only visible providers)
+        val visibleCaches = mutableSetOf<String>()
+        for (renderer in tileServerRenderers) {
+            if (renderer.tilesTotal > 0) {
+                visibleCaches.add(renderer.tileFetcher.tileCacheName)
+            }
+        }
+        attributionRenderer.draw(canvas, width, height, visibleCaches)
 
         // Tile loading progress bar
         drawProgressBar(canvas)
