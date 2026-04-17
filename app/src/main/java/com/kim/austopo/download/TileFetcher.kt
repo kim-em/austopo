@@ -104,10 +104,7 @@ class TileFetcher(
         )
 
         fun qld() = TileFetcher(
-            // Reverted to gisservices — spatial-gis was claimed to be a
-            // canonical redirect, but the tiles looked worse.  OkHttp
-            // follows 301s automatically if it does redirect.
-            baseUrl = "https://gisservices.information.qld.gov.au/arcgis/rest/services/Basemaps/QldMap_Topo/MapServer/tile",
+            baseUrl = "https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Basemaps/QldMap_Topo/MapServer/tile",
             extentMinX = 15360000.0,   // ~138°E
             extentMaxX = 17150000.0,   // ~154°E
             extentMinY = -3380000.0,   // ~-29°S
