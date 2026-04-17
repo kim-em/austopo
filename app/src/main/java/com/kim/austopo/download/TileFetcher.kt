@@ -27,7 +27,9 @@ class TileFetcher(
     val extentMaxY: Double,
     val minLod: Int = 6,
     val maxLod: Int = 23,
-    cacheName: String = "tiles"
+    cacheName: String = "tiles",
+    /** Contrast multiplier for tile rendering (1.0 = no change). */
+    val contrast: Float = 1.0f
 ) {
 
     /** Full URL for a single tile (ArcGIS REST cached tile service). */
@@ -100,7 +102,8 @@ class TileFetcher(
             extentMinY = -4750000.0,   // ~-39.2°S
             extentMaxY = -4020000.0,   // ~-34°S
             maxLod = 23,
-            cacheName = "tiles_vic"
+            cacheName = "tiles_vic",
+            contrast = 1.3f   // faint at highest zooms
         )
 
         fun qld() = TileFetcher(
@@ -120,7 +123,8 @@ class TileFetcher(
             extentMinY = -4585000.0,   // ~-38°S
             extentMaxY = -2990000.0,   // ~-26°S
             maxLod = 20,
-            cacheName = "tiles_sa"
+            cacheName = "tiles_sa",
+            contrast = 1.4f   // thin lines, low contrast
         )
 
         fun tas() = TileFetcher(
@@ -130,7 +134,8 @@ class TileFetcher(
             extentMinY = -5432000.0,   // ~-43.7°S
             extentMaxY = -4800000.0,   // ~-39.6°S
             maxLod = 18,
-            cacheName = "tiles_tas"
+            cacheName = "tiles_tas",
+            contrast = 1.4f   // thin lines, low contrast
         )
 
         /**
@@ -203,8 +208,13 @@ class TileFetcher(
 
     /** Find the best LOD level for the current camera zoom (meters per pixel). */
     fun bestLod(metersPerPixel: Double): Int {
+        // Pick the finest LOD whose resolution is at most 75% of the camera's
+        // meters-per-pixel. Without the 0.75 factor we'd switch to the next
+        // LOD as soon as the camera barely crosses the threshold, loading 4x
+        // more tiles before the extra detail is visually useful.
+        val threshold = metersPerPixel * 0.75
         for (i in LOD_RESOLUTIONS.indices) {
-            if (LOD_RESOLUTIONS[i] <= metersPerPixel) {
+            if (LOD_RESOLUTIONS[i] <= threshold) {
                 return i.coerceAtMost(maxLod)
             }
         }

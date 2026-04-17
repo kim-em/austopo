@@ -11,7 +11,18 @@ import com.kim.austopo.download.TileFetcher
  */
 class TileServerRenderer(val tileFetcher: TileFetcher) {
 
-    private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        if (tileFetcher.contrast != 1.0f) {
+            val c = tileFetcher.contrast
+            val t = 128f * (1f - c)  // translate to keep midpoint stable
+            colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
+                c, 0f, 0f, 0f, t,
+                0f, c, 0f, 0f, t,
+                0f, 0f, c, 0f, t,
+                0f, 0f, 0f, 1f, 0f
+            )))
+        }
+    }
 
     // Loading state from last draw
     var tilesTotal = 0
