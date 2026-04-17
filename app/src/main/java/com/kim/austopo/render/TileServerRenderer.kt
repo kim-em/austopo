@@ -111,13 +111,20 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
 
         for (row in minRow..maxRow) {
             for (col in minCol..maxCol) {
-                // Skip tiles that belong to a different state
-                if (idx != null && myState.isNotEmpty()) {
+                // Check if this tile belongs to a different state
+                val skip = if (idx != null && myState.isNotEmpty()) {
                     val owner = idx.ownerForTile(lod, col, row)
-                    if (owner != null && owner != myState) continue
-                }
-                total++
+                    owner != null && owner != myState
+                } else false
+
+                // Always fetch the tile (even if we won't draw it) so it's
+                // in our cache as a fallback parent for finer-LOD tiles
+                // that ARE in our state.
                 val bitmap = tileFetcher.getTile(lod, col, row)
+
+                if (skip) continue
+
+                total++
                 if (bitmap != null) {
                     loaded++
                     drawTile(canvas, camera, bitmap, col, row, lod)
