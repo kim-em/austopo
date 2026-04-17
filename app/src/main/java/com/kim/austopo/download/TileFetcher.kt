@@ -27,7 +27,9 @@ class TileFetcher(
     val extentMaxY: Double,
     val minLod: Int = 6,
     val maxLod: Int = 23,
-    cacheName: String = "tiles"
+    cacheName: String = "tiles",
+    /** State ID for boundary-based tile ownership (e.g. "NSW", "VIC"). */
+    val stateId: String = ""
 ) {
 
     /** Full URL for a single tile (ArcGIS REST cached tile service). */
@@ -69,6 +71,17 @@ class TileFetcher(
         const val ORIGIN_Y = 20037508.342789244
         const val TILE_SIZE = 256
 
+        /** Static tile bounds for use by StateBoundaryIndex (no instance needed). */
+        fun tileBoundsStatic(col: Int, row: Int, lod: Int): DoubleArray {
+            val res = LOD_RESOLUTIONS[lod.coerceIn(0, LOD_RESOLUTIONS.size - 1)]
+            val tileSize = res * TILE_SIZE
+            val minX = ORIGIN_X + col * tileSize
+            val maxX = minX + tileSize
+            val maxY = ORIGIN_Y - row * tileSize
+            val minY = maxY - tileSize
+            return doubleArrayOf(minX, minY, maxX, maxY)
+        }
+
         // maxLod values below come from each server's published tileInfo.lods
         // array (MapServer?f=json). Setting them stops bestLod from requesting
         // tiles the server doesn't cache — at higher camera zoom the view just
@@ -81,7 +94,7 @@ class TileFetcher(
             extentMinY = -4400000.0,   // ~-37°S
             extentMaxY = -3100000.0,   // ~-27°S
             maxLod = 21,
-            cacheName = "tiles_nsw"
+            cacheName = "tiles_nsw", stateId = "NSW"
         )
 
         /**
@@ -98,9 +111,10 @@ class TileFetcher(
             extentMinX = 15688000.0,   // ~141°E
             extentMaxX = 16693000.0,   // ~150°E
             extentMinY = -4750000.0,   // ~-39.2°S
-            extentMaxY = -4300000.0,   // ~-36°S (Murray River / VIC northern border)
+            extentMaxY = -4020000.0,   // ~-34°S (wider than VIC for tile coverage;
+                                       //  polygon boundary handles actual ownership)
             maxLod = 23,
-            cacheName = "tiles_vic"
+            cacheName = "tiles_vic", stateId = "VIC"
         )
 
         fun qld() = TileFetcher(
@@ -110,7 +124,7 @@ class TileFetcher(
             extentMinY = -3380000.0,   // ~-29°S
             extentMaxY = -1120000.0,   // ~-10°S
             maxLod = 23,
-            cacheName = "tiles_qld"
+            cacheName = "tiles_qld", stateId = "QLD"
         )
 
         fun sa() = TileFetcher(
@@ -120,7 +134,7 @@ class TileFetcher(
             extentMinY = -4585000.0,   // ~-38°S
             extentMaxY = -2990000.0,   // ~-26°S
             maxLod = 20,
-            cacheName = "tiles_sa"
+            cacheName = "tiles_sa", stateId = "SA"
         )
 
         fun tas() = TileFetcher(
@@ -130,7 +144,7 @@ class TileFetcher(
             extentMinY = -5432000.0,   // ~-43.7°S
             extentMaxY = -4800000.0,   // ~-39.6°S
             maxLod = 18,
-            cacheName = "tiles_tas"
+            cacheName = "tiles_tas", stateId = "TAS"
         )
 
         /**
@@ -147,7 +161,7 @@ class TileFetcher(
             extentMinY = -2990000.0,   // ~-26°S (NT/SA border)
             extentMaxY = -1170000.0,   // ~-10.5°S (Tiwi Islands)
             maxLod = 23,
-            cacheName = "tiles_nt"
+            cacheName = "tiles_nt", stateId = "NT"
         )
 
         fun wa() = TileFetcher(
@@ -157,7 +171,7 @@ class TileFetcher(
             extentMinY = -4165000.0,   // ~-35°S (south coast)
             extentMaxY = -1460000.0,   // ~-13°S (Kimberley)
             maxLod = 23,
-            cacheName = "tiles_wa"
+            cacheName = "tiles_wa", stateId = "WA"
         )
     }
 

@@ -3,6 +3,7 @@ package com.kim.austopo.render
 import android.graphics.*
 import com.kim.austopo.MapCamera
 import com.kim.austopo.download.TileFetcher
+import com.kim.austopo.geo.StateBoundaryIndex
 
 /**
  * Renders topo map tiles from an ArcGIS tile server.
@@ -11,6 +12,8 @@ import com.kim.austopo.download.TileFetcher
  */
 class TileServerRenderer(val tileFetcher: TileFetcher) {
 
+    /** Set by MapActivity after construction. */
+    var boundaryIndex: StateBoundaryIndex? = null
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
@@ -103,8 +106,16 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
         var total = 0
         var loaded = 0
 
+        val myState = tileFetcher.stateId
+        val idx = boundaryIndex
+
         for (row in minRow..maxRow) {
             for (col in minCol..maxCol) {
+                // Skip tiles that belong to a different state
+                if (idx != null && myState.isNotEmpty()) {
+                    val owner = idx.ownerForTile(lod, col, row)
+                    if (owner != null && owner != myState) continue
+                }
                 total++
                 val bitmap = tileFetcher.getTile(lod, col, row)
                 if (bitmap != null) {

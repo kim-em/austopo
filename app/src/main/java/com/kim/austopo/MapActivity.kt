@@ -104,11 +104,8 @@ class MapActivity : Activity(), LocationListener {
         mapView = TiledMapView(this)
         mapView.repository = repository
 
-        // Set up tile servers. Order matters: later renderers paint on top.
-        // GA base layer first (NT, WA), then large-extent state servers, then
-        // smaller/more-specific ones last so they "win" in overlap zones.
-        // NSW after VIC because VIC's rectangular extent captures a strip of
-        // NSW territory where Mapscape has no data — NSW tiles should cover it.
+        // Set up tile servers with boundary-based tile ownership.
+        val boundaryIndex = com.kim.austopo.geo.StateBoundaryIndex.get(this)
         for (fetcher in listOf(
             TileFetcher.nt(), TileFetcher.wa(),
             TileFetcher.sa(), TileFetcher.qld(),
@@ -120,7 +117,9 @@ class MapActivity : Activity(), LocationListener {
             fetcher.pinnedStore = pinnedStore
             fetcher.transientStore = transientStore
             fetcher.onTransientWrite = { cacheCapEnforcer.onTileWritten() }
-            mapView.tileServerRenderers.add(TileServerRenderer(fetcher))
+            val renderer = TileServerRenderer(fetcher)
+            renderer.boundaryIndex = boundaryIndex
+            mapView.tileServerRenderers.add(renderer)
         }
 
         // Persisted prefs
