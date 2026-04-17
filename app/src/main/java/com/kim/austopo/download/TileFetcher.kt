@@ -27,33 +27,11 @@ class TileFetcher(
     val extentMaxY: Double,
     val minLod: Int = 6,
     val maxLod: Int = 23,
-    cacheName: String = "tiles",
-    private val urlFormat: UrlFormat = UrlFormat.ARCGIS_REST,
-    /**
-     * Whether offline-region downloads may pre-seed tiles from this server.
-     * False for OpenTopoMap (WA), whose operators forbid bulk pre-fetching —
-     * only tiles the user is actively viewing may be requested.
-     */
-    val bulkDownloadAllowed: Boolean = true
+    cacheName: String = "tiles"
 ) {
 
-    /**
-     * How to build a tile URL from [baseUrl] and tile coordinates.
-     *
-     * - [ARCGIS_REST] → `{baseUrl}/{lod}/{row}/{col}` (Esri cached tile service).
-     * - [XYZ_PNG] → `{baseUrl}/{lod}/{col}/{row}.png` (OSM slippy-map / XYZ).
-     *
-     * Both schemes use the same Web Mercator tiling grid (origin top-left,
-     * 256 px tiles, resolutions in [LOD_RESOLUTIONS]), so the numeric
-     * lod/col/row are interchangeable — only the URL layout differs.
-     */
-    enum class UrlFormat { ARCGIS_REST, XYZ_PNG }
-
-    /** Full URL for a single tile. */
-    fun tileUrl(lod: Int, col: Int, row: Int): String = when (urlFormat) {
-        UrlFormat.ARCGIS_REST -> "$baseUrl/$lod/$row/$col"
-        UrlFormat.XYZ_PNG -> "$baseUrl/$lod/$col/$row.png"
-    }
+    /** Full URL for a single tile (ArcGIS REST cached tile service). */
+    fun tileUrl(lod: Int, col: Int, row: Int): String = "$baseUrl/$lod/$row/$col"
 
     companion object {
         private const val RETRY_DELAY_MS = 2000L
@@ -147,10 +125,11 @@ class TileFetcher(
         )
 
         /**
-         * Northern Territory: no dedicated state topo tile server is published,
-         * so we fall back to Geoscience Australia's national topographic base
-         * map (CC BY 4.0, © Commonwealth of Australia / Geoscience Australia).
-         * Same ArcGIS REST tile scheme as the state services.
+         * NT and WA: neither state publishes a free public topo tile server
+         * (Landgate's WA basemap is paywalled behind SLIP), so both fall back
+         * to Geoscience Australia's national topographic base map (CC BY 4.0,
+         * © Commonwealth of Australia / Geoscience Australia). Same ArcGIS
+         * REST tile scheme as the state services; full LOD range cached.
          */
         fun nt() = TileFetcher(
             baseUrl = "https://services.ga.gov.au/gis/rest/services/Topographic_Base_Map/MapServer/tile",
@@ -158,26 +137,18 @@ class TileFetcher(
             extentMaxX = 15365000.0,   // ~138°E (NT/QLD border)
             extentMinY = -2990000.0,   // ~-26°S (NT/SA border)
             extentMaxY = -1170000.0,   // ~-10.5°S (Tiwi Islands)
+            maxLod = 23,
             cacheName = "tiles_nt"
         )
 
-        /**
-         * Western Australia: Landgate's official basemap is paywalled behind
-         * SLIP, so we use OpenTopoMap (© OpenStreetMap contributors, SRTM;
-         * rendering © OpenTopoMap, CC-BY-SA) for WA only. XYZ tile scheme,
-         * tops out at zoom 17.
-         */
         fun wa() = TileFetcher(
-            baseUrl = "https://a.tile.opentopomap.org",
+            baseUrl = "https://services.ga.gov.au/gis/rest/services/Topographic_Base_Map/MapServer/tile",
             extentMinX = 12575000.0,   // ~113°E (west coast)
             extentMaxX = 14360000.0,   // ~129°E (WA/NT/SA border)
             extentMinY = -4165000.0,   // ~-35°S (south coast)
             extentMaxY = -1460000.0,   // ~-13°S (Kimberley)
-            maxLod = 17,
-            cacheName = "tiles_wa",
-            urlFormat = UrlFormat.XYZ_PNG,
-            // OpenTopoMap / OSM policy: only tiles actively being viewed.
-            bulkDownloadAllowed = false
+            maxLod = 23,
+            cacheName = "tiles_wa"
         )
     }
 
