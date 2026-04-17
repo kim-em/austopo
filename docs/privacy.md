@@ -13,10 +13,10 @@ AusTopo is a free, open-source Android app for viewing Australian topographic ma
 The tile servers AusTopo contacts and their operators' privacy policies:
 
 - **NSW** — maps.six.nsw.gov.au, operated by NSW Spatial Services. [Privacy policy](https://www.spatial.nsw.gov.au/privacy).
-- **VIC** — emap.ffm.vic.gov.au, operated by Forest Fire Management Victoria (DEECA). Privacy governed by the Victorian Government's [Privacy and Data Protection Act 2014](https://www.legislation.vic.gov.au/in-force/acts/privacy-and-data-protection-act-2014).
+- **VIC** — emap.ffm.vic.gov.au, operated by Forest Fire Management Victoria (DEECA). [Privacy policy](https://www.deeca.vic.gov.au/privacy).
 - **QLD** — spatial-gis.information.qld.gov.au, operated by the Queensland Government. [Privacy statement](https://www.qld.gov.au/legal/privacy).
-- **SA** — location.sa.gov.au, operated by the SA Department for Environment and Water. Privacy governed by the SA Government's [Information Privacy Principles](https://archives.sa.gov.au/managing-information/privacy-personal-information/information-privacy-principles-ipps-instruction).
-- **TAS** — services.thelist.tas.gov.au, operated by the Tasmanian Government (theLIST). Privacy governed by the Tasmanian Government's [Personal Information Protection Act 2004](https://www.legislation.tas.gov.au/view/html/inforce/current/act-2004-046).
+- **SA** — location.sa.gov.au, operated by the SA Department for Environment and Water. [Privacy statement](https://www.environment.sa.gov.au/privacy-statement).
+- **TAS** — services.thelist.tas.gov.au, operated by the Tasmanian Government (theLIST). [Personal information protection](https://www.tas.gov.au/stds/pip.htm).
 - **NT and WA** — services.ga.gov.au, operated by Geoscience Australia. [Privacy policy](https://www.ga.gov.au/privacy).
 
 **Bookmarks.** Saved bookmarks (place names and coordinates) are stored locally on your device in the app's private storage. They are not transmitted anywhere.
