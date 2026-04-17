@@ -108,8 +108,6 @@ class OfflineRegionDownloader(
         fetcherEntries: List<Entry>
     ): List<Plan> = fetcherEntries.mapNotNull { entry ->
         val f = entry.fetcher
-        // Respect servers that forbid bulk pre-fetching (e.g. OpenTopoMap for WA).
-        if (!f.bulkDownloadAllowed) return@mapNotNull null
         val cMinX = maxOf(minMX, f.extentMinX)
         val cMaxX = minOf(maxMX, f.extentMaxX)
         val cMinY = maxOf(minMY, f.extentMinY)
