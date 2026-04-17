@@ -23,6 +23,8 @@ class TiledMapView(context: Context) : View(context) {
     private val scaleBarRenderer = ScaleBarRenderer()
     private val gridRenderer = GridRenderer()
     private val attributionRenderer = AttributionRenderer()
+    /** Multiplier for LOD selection. >1.0 = coarser tiles = bigger text. */
+    var detailFactor: Double = 1.0
     var showKmGrid = false
     val tileServerRenderers = mutableListOf<TileServerRenderer>()
 
@@ -197,8 +199,10 @@ class TiledMapView(context: Context) : View(context) {
         // Draw tile server imagery. Compute LOD once so all renderers use
         // the same LOD — per-renderer LOD selection causes ownership gaps
         // when renderers pick different LODs via independent hysteresis.
+        // detailFactor > 1.0 makes the LOD selection think the camera is
+        // zoomed out further, keeping coarser tiles longer → bigger text.
         val lod = if (tileServerRenderers.isNotEmpty()) {
-            tileServerRenderers[0].tileFetcher.bestLod(camera.metersPerPixel())
+            tileServerRenderers[0].tileFetcher.bestLod(camera.metersPerPixel() * detailFactor)
         } else 0
         for (renderer in tileServerRenderers) {
             renderer.draw(canvas, camera, lod)

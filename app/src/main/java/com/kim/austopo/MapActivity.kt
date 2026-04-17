@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import android.app.AlertDialog
@@ -80,6 +81,7 @@ class MapActivity : Activity(), LocationListener {
         private const val MENU_SHEET_GRID = 7
         private const val MENU_KM_GRID = 8
         private const val MENU_SEARCH = 9
+        private const val MENU_MAP_DETAIL = 10
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,6 +125,7 @@ class MapActivity : Activity(), LocationListener {
         }
 
         // Persisted prefs
+        mapView.detailFactor = prefs.getFloat("detail_factor", defaultDetailFactor()).toDouble()
         mapView.showSheetRectangles = prefs.getBoolean("show_sheet_rectangles", false)
         mapView.showKmGrid = prefs.getBoolean("show_km_grid", false)
 
@@ -377,6 +380,50 @@ class MapActivity : Activity(), LocationListener {
             .apply()
         mapView.invalidate()
     }
+
+    private fun actionMapDetail() {
+        val prefs = getSharedPreferences("austopo_sheets", MODE_PRIVATE)
+        val currentFactor = prefs.getFloat("detail_factor", defaultDetailFactor())
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
+        val label = TextView(this).apply {
+            text = formatDetailFactor(currentFactor)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 16)
+        }
+        layout.addView(label)
+        val seekBar = SeekBar(this).apply {
+            max = 100
+            progress = detailFactorToProgress(currentFactor)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    label.text = formatDetailFactor(progressToDetailFactor(progress))
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
+        }
+        layout.addView(seekBar)
+        AlertDialog.Builder(this)
+            .setTitle("Map Detail")
+            .setView(layout)
+            .setPositiveButton("OK") { _, _ ->
+                val factor = progressToDetailFactor(seekBar.progress)
+                prefs.edit().putFloat("detail_factor", factor).apply()
+                mapView.detailFactor = factor.toDouble()
+                mapView.invalidate()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun progressToDetailFactor(progress: Int): Float = 1.0f + progress / 100f * 3.0f
+    private fun detailFactorToProgress(factor: Float): Int = ((factor - 1.0f) / 3.0f * 100f).toInt().coerceIn(0, 100)
+    private fun formatDetailFactor(factor: Float): String = if (factor <= 1.05f) "Native" else "%.1fx".format(factor)
+    private fun defaultDetailFactor(): Float = (resources.displayMetrics.densityDpi / 150f).coerceIn(1.0f, 4.0f)
 
     private fun actionSaveOffline() {
         mapView.selectionMode = true
@@ -641,6 +688,19 @@ class MapActivity : Activity(), LocationListener {
         bar.addView(title, LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
         ))
+        val searchButton = Button(this).apply {
+            text = "\uD83D\uDD0D"   // 🔍 magnifying glass
+            textSize = 20f
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0x00000000)
+            minWidth = 0
+            minimumWidth = 0
+            setPadding(24, 4, 12, 4)
+            setOnClickListener { actionSearch() }
+        }
+        bar.addView(searchButton, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         hamburgerButton = Button(this).apply {
             text = "\u2630"   // ☰ trigram for heaven (hamburger icon)
             textSize = 22f
@@ -670,6 +730,7 @@ class MapActivity : Activity(), LocationListener {
             if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid")
         popup.menu.add(0, MENU_KM_GRID, 8,
             if (mapView.showKmGrid) "Hide 1 km Grid" else "Show 1 km Grid")
+        popup.menu.add(0, MENU_MAP_DETAIL, 9, "Map Detail")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SEARCH -> { actionSearch(); true }
@@ -681,6 +742,7 @@ class MapActivity : Activity(), LocationListener {
                 MENU_SYNC_NSW -> { actionSyncNsw(); true }
                 MENU_SHEET_GRID -> { actionToggleOverlay(); true }
                 MENU_KM_GRID -> { actionToggleGrid(); true }
+                MENU_MAP_DETAIL -> { actionMapDetail(); true }
                 else -> false
             }
         }
