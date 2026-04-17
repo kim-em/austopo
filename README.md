@@ -105,10 +105,6 @@ Every entry is sourced from the provider's published terms — links given. Wher
 | TAS | services.thelist.tas.gov.au · `Basemaps/Topographic/MapServer` | [CC BY 3.0 AU](https://creativecommons.org/licenses/by/3.0/au/) — declared in [service metadata](https://services.thelist.tas.gov.au/arcgis/rest/services/Basemaps/Topographic/MapServer?f=pjson) `copyrightText` field; governed by [LIST Web Services T&C](http://listdata.thelist.tas.gov.au/public/LISTWebServicesTermsConditions.pdf) | ✅ confirmed |
 | NT, WA | services.ga.gov.au · `Topographic_Base_Map/MapServer` | [CC BY 4.0](https://www.ga.gov.au/copyright) | ✅ confirmed |
 
-### SA — likely CC BY 4.0, confirmation email sent
-
-SA's [Open Data Principles](https://www.dpc.sa.gov.au/responsibilities/ict-digital-cyber-security/policies-and-guidelines/data/open-data-principles) specify CC BY 4.0 as the preferred licence (Principle 3) and explicitly contemplate APIs and web services (Principle 6). The [Location SA Viewer](https://location.sa.gov.au/viewer/) declares CC BY 4.0 in its footer. All Location SA datasets on [data.sa.gov.au](https://data.sa.gov.au/data/organization/location-sa) are listed under CC BY. SA government [gave explicit permission to OpenStreetMap](https://wiki.openstreetmap.org/wiki/Attribution/sa.data.gov.au_explicit_permission) for re-use of CC-BY data. However, the tile service endpoint itself has empty metadata fields and no explicit licence. Emailed `locationsa@sa.gov.au` on 17 April 2026 to confirm. See [permissions/sa-location.md](permissions/sa-location.md).
-
 ### Required attribution strings
 
 Rendered in the bottom-right of the map view:
