@@ -418,21 +418,22 @@ class MapActivity : Activity(), LocationListener {
             .show()
     }
 
-    /** Slider 0 = 1.0 (normal), slider 100 = 0.25 (4x detail). */
+    /** Slider 0 = 1.0 (native), slider 100 = 4.0 (text 4x larger, coarser tiles). */
     private fun progressToFactor(progress: Int): Float =
-        (1.0f - progress / 100f * 0.75f)
+        1.0f + progress / 100f * 3.0f
 
     private fun factorToProgress(factor: Float): Int =
-        ((1.0f - factor) / 0.75f * 100f).toInt().coerceIn(0, 100)
+        ((factor - 1.0f) / 3.0f * 100f).toInt().coerceIn(0, 100)
 
-    private fun formatFactor(factor: Float): String {
-        val mult = 1.0f / factor
-        return if (mult <= 1.05f) "Normal" else "%.1fx detail".format(mult)
-    }
+    private fun formatFactor(factor: Float): String =
+        if (factor <= 1.05f) "Native" else "%.1fx".format(factor)
 
     private fun defaultDetailFactor(): Float {
+        // Tiles are 256px designed for ~150 DPI. On a 420 DPI phone the text
+        // is 2.8x too small, so default to DPI/150 which upscales tiles to
+        // approximately the intended physical size.
         val dpi = resources.displayMetrics.densityDpi
-        return (150f / dpi).coerceIn(0.25f, 1.0f)
+        return (dpi / 150f).coerceIn(1.0f, 4.0f)
     }
 
     private fun applyDetailFactor(factor: Float) {
