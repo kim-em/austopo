@@ -1,6 +1,6 @@
 # AusTopo Privacy Policy
 
-*Last updated: 17 April 2026*
+*Last updated: 18 April 2026*
 
 AusTopo is a free, open-source Android app for viewing Australian topographic maps. It is developed by Kim Morrison and the source code is available at [github.com/kim-em/austopo](https://github.com/kim-em/austopo).
 
@@ -19,6 +19,8 @@ The tile servers AusTopo contacts and their operators' privacy policies:
 - **TAS** — services.thelist.tas.gov.au, operated by the Tasmanian Government (theLIST). [Personal information protection](https://www.tas.gov.au/stds/pip.htm).
 - **NT and WA** — services.ga.gov.au, operated by Geoscience Australia. [Privacy policy](https://www.ga.gov.au/privacy).
 
+**Place search.** When you use "Search Place" from the menu, AusTopo sends your search query to the [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) geocoding service over HTTPS. The request contains the search text you typed, your device's IP address, and a User-Agent string identifying the app. No location data, device identifiers, or other personal information is included. Nominatim is operated by the OpenStreetMap Foundation; their [privacy policy](https://osmfoundation.org/wiki/Privacy_Policy) and [usage policy](https://operations.osmfoundation.org/policies/nominatim/) apply to these requests.
+
 **Bookmarks.** Saved bookmarks (place names and coordinates) are stored locally on your device in the app's private storage. They are not transmitted anywhere.
 
 **Offline tiles.** Cached and pinned tiles are stored locally on your device. They are not transmitted anywhere.
@@ -29,7 +31,7 @@ None. AusTopo has no analytics, no crash reporting, no advertising, no user acco
 
 ## Third-party services
 
-The only network requests AusTopo makes are HTTPS tile fetches to the government tile servers listed above. AusTopo does not integrate any third-party SDKs, ad networks, or analytics services.
+The only network requests AusTopo makes are HTTPS tile fetches to the government tile servers listed above and place search queries to OpenStreetMap Nominatim. AusTopo does not integrate any third-party SDKs, ad networks, or analytics services.
 
 ## Children's privacy
 

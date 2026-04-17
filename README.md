@@ -46,6 +46,10 @@ Drag-select a bounding box on the map and pin every tile inside it (across all r
 
 Transient (non-pinned) tiles are capped by a user-configurable size limit, set from Cache Management with a SeekBar + live readout. A debounced LRU eviction pass runs after writes once the cap is exceeded. Pinned tiles are never counted against the cap.
 
+## Place search
+
+Search for Australian places (towns, mountains, rivers, etc.) via the [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) geocoding API. Results are scoped to Australia (`countrycodes=au`). Tap a result to pan the map to that location. No API key or registration required.
+
 ## Bookmarks
 
 A RecyclerView of saved locations with swipe-to-delete and 5-second UNDO (survives rotation), overflow-menu rename, and paste-to-add. The paste parser accepts:
@@ -71,7 +75,7 @@ For areas without a good tile server, or for offline-first use, the app can disp
 
 ## UI
 
-Translucent title bar with "AusTopo" label and a hamburger menu. Tap the hamburger to access: My Location, Bookmarks, Save Offline, Offline Regions, Cache Management, Sync NSW Index, Show/Hide Sheet Grid, Show/Hide 1 km Grid. The title bar auto-hides on pan and restores on tap.
+Translucent title bar with "AusTopo" label and a hamburger menu. Tap the hamburger to access: Search Place, My Location, Bookmarks, Save Offline, Offline Regions, Cache Management, Sync NSW Index, Show/Hide Sheet Grid, Show/Hide 1 km Grid. The title bar auto-hides on pan and restores on tap.
 
 ## Geodesy
 

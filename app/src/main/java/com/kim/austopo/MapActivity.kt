@@ -22,6 +22,7 @@ import android.app.NotificationManager
 import android.widget.EditText
 import com.kim.austopo.data.MapSheet
 import com.kim.austopo.data.MapSheetRepository
+import com.kim.austopo.data.PlaceSearchClient
 import com.kim.austopo.data.SheetStatus
 import com.kim.austopo.download.CacheCapEnforcer
 import com.kim.austopo.download.OfflineRegion
@@ -78,6 +79,7 @@ class MapActivity : Activity(), LocationListener {
         private const val MENU_SYNC_NSW = 6
         private const val MENU_SHEET_GRID = 7
         private const val MENU_KM_GRID = 8
+        private const val MENU_SEARCH = 9
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -284,6 +286,54 @@ class MapActivity : Activity(), LocationListener {
             mapView.invalidate()
         } else {
             Toast.makeText(this, "Acquiring GPS fix\u2026", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun actionSearch() {
+        val input = EditText(this).apply {
+            hint = "e.g. Mount Kosciuszko, Uluru, Cradle Mountain"
+            setSingleLine(true)
+            setPadding(48, 32, 48, 16)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Search Place")
+            .setView(input)
+            .setPositiveButton("Search") { _, _ ->
+                val query = input.text.toString().trim()
+                if (query.isNotEmpty()) performSearch(query)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performSearch(query: String) {
+        scope.launch {
+            val results = try {
+                PlaceSearchClient.search(query)
+            } catch (e: Exception) {
+                Toast.makeText(this@MapActivity, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (results.isEmpty()) {
+                Toast.makeText(this@MapActivity, "No results for \"$query\"", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            // Show short display names (strip trailing ", Australia" etc.)
+            val names = results.map { r ->
+                r.displayName
+                    .replace(Regex(",\\s*Australia$"), "")
+                    .let { if (it.length > 60) it.take(57) + "..." else it }
+            }.toTypedArray()
+            AlertDialog.Builder(this@MapActivity)
+                .setTitle("Results for \"$query\"")
+                .setItems(names) { _, which ->
+                    val r = results[which]
+                    val (mx, my) = CoordinateConverter.wgs84ToWebMercator(r.latitude, r.longitude)
+                    mapView.camera.setPosition(mx, my, maxOf(mapView.camera.zoom, 0.1f))
+                    mapView.invalidate()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
     }
 
@@ -605,18 +655,20 @@ class MapActivity : Activity(), LocationListener {
 
     private fun showMainMenu() {
         val popup = PopupMenu(this, hamburgerButton)
-        popup.menu.add(0, MENU_LOCATION, 0, "My Location")
-        popup.menu.add(0, MENU_BOOKMARKS, 1, "Bookmarks")
-        popup.menu.add(0, MENU_SAVE_OFFLINE, 2, "Save Offline")
-        popup.menu.add(0, MENU_OFFLINE_REGIONS, 3, "Offline Regions")
-        popup.menu.add(0, MENU_CACHE, 4, "Cache Management")
-        popup.menu.add(0, MENU_SYNC_NSW, 5, "Sync NSW Index")
-        popup.menu.add(0, MENU_SHEET_GRID, 6,
+        popup.menu.add(0, MENU_SEARCH, 0, "Search Place")
+        popup.menu.add(0, MENU_LOCATION, 1, "My Location")
+        popup.menu.add(0, MENU_BOOKMARKS, 2, "Bookmarks")
+        popup.menu.add(0, MENU_SAVE_OFFLINE, 3, "Save Offline")
+        popup.menu.add(0, MENU_OFFLINE_REGIONS, 4, "Offline Regions")
+        popup.menu.add(0, MENU_CACHE, 5, "Cache Management")
+        popup.menu.add(0, MENU_SYNC_NSW, 6, "Sync NSW Index")
+        popup.menu.add(0, MENU_SHEET_GRID, 7,
             if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid")
-        popup.menu.add(0, MENU_KM_GRID, 7,
+        popup.menu.add(0, MENU_KM_GRID, 8,
             if (mapView.showKmGrid) "Hide 1 km Grid" else "Show 1 km Grid")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                MENU_SEARCH -> { actionSearch(); true }
                 MENU_LOCATION -> { actionMyLocation(); true }
                 MENU_BOOKMARKS -> { actionBookmarks(); true }
                 MENU_SAVE_OFFLINE -> { actionSaveOffline(); true }
