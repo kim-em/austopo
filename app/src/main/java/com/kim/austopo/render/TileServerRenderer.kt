@@ -72,7 +72,7 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
             val (mxc, mr) = tileFetcher.tileForMercator(clippedMaxX, clippedMaxY, drawLod)
             minCol = mc; maxCol = mxc; minRow = mr; maxRow = mxr
             val count = (maxCol - minCol + 1) * (maxRow - minRow + 1)
-            if (count <= 400) {
+            if (true) {
                 Log.d("TileOwnership", "DRAW ${tileFetcher.stateId} drawLod=$drawLod targetLod=$lod cols=$minCol..$maxCol rows=$minRow..$maxRow count=$count")
                 // Draw at this LOD
                 val result = drawGrid(canvas, camera, drawLod, minCol, maxCol, minRow, maxRow)
