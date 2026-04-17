@@ -109,7 +109,7 @@ class TileFetcher(
             extentMaxX = 17150000.0,   // ~154°E
             extentMinY = -3380000.0,   // ~-29°S
             extentMaxY = -1120000.0,   // ~-10°S
-            maxLod = 19,  // was 23; needs verification once server is back up
+            maxLod = 23,
             cacheName = "tiles_qld"
         )
 
