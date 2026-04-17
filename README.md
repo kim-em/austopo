@@ -99,27 +99,43 @@ Every entry is sourced from the provider's published terms — links given. Wher
 | State | Endpoint | Licence | Status |
 | --- | --- | --- | --- |
 | NSW | maps.six.nsw.gov.au · `NSW_Topo_Map/MapServer` | [CC BY 4.0](https://www.spatial.nsw.gov.au/copyright) | ✅ confirmed |
-| VIC | emap.ffm.vic.gov.au · `mapscape_mercator/MapServer` | Vicmap data is generally [CC BY 4.0](https://www.land.vic.gov.au/) but the FFM-operated tile cache is not separately documented | ⚠ email confirmation pending |
-| QLD | spatial-gis.information.qld.gov.au · `QldMap_Topo/MapServer` | [CC BY 4.0](https://www.qld.gov.au/legal/copyright) (Queensland Government default) | ✅ confirmed (per default policy) |
-| SA | location.sa.gov.au · `Topographic_wmas/MapServer` | DataSA endorses CC BY 4.0 per dataset; this MapServer's specific licence statement is not separately published | ⚠ email confirmation pending |
-| TAS | services.thelist.tas.gov.au · `Basemaps/Topographic/MapServer` | theLIST publishes a copyright/disclaimer notice but no per-service CC declaration | ⚠ email confirmation pending |
-| NT, WA fallback | services.ga.gov.au · `Topographic_Base_Map/MapServer` | [CC BY 4.0](https://www.ga.gov.au/copyright) | ✅ confirmed |
-| WA (live tiles only) | OpenTopoMap (a/b/c.tile.opentopomap.org) | OSM data [ODbL](https://www.openstreetmap.org/copyright); rendering [CC BY-SA 3.0](https://opentopomap.org/about) | ⚠ usage-policy email pending |
+| VIC | emap.ffm.vic.gov.au · `mapscape_mercator/MapServer` | ⚠ Ambiguous — see below | ⚠ email required |
+| QLD | spatial-gis.information.qld.gov.au · `QldMap_Topo/MapServer` | [CC BY 4.0](https://www.qld.gov.au/legal/copyright) (Queensland Government default) | ✅ confirmed |
+| SA | location.sa.gov.au · `Topographic_wmas/MapServer` | Likely [CC BY 4.0](https://www.dpc.sa.gov.au/responsibilities/ict-digital-cyber-security/policies-and-guidelines/data/open-data-principles) — see below | ⚠ email to confirm |
+| TAS | services.thelist.tas.gov.au · `Basemaps/Topographic/MapServer` | [CC BY 3.0 AU](https://creativecommons.org/licenses/by/3.0/au/) — declared in [service metadata](https://services.thelist.tas.gov.au/arcgis/rest/services/Basemaps/Topographic/MapServer?f=pjson) `copyrightText` field; governed by [LIST Web Services T&C](http://listdata.thelist.tas.gov.au/public/LISTWebServicesTermsConditions.pdf) | ✅ confirmed |
+| NT, WA | services.ga.gov.au · `Topographic_Base_Map/MapServer` | [CC BY 4.0](https://www.ga.gov.au/copyright) | ✅ confirmed |
 
-Required attribution strings (rendered in the bottom-right of the map view):
+### VIC — requires email
 
-- **NSW** — *© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW). For current information go to spatial.nsw.gov.au.*
-- **QLD** — *© State of Queensland*.
-- **GA** — *© Commonwealth of Australia (Geoscience Australia)*.
-- **OpenTopoMap (if WA stays on OTM)** — *Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)*.
+The Mapscape tiles at `emap.ffm.vic.gov.au` are a **rendered basemap product** created by Spatial Vision (now Veris) under contract to the Victorian government. While the underlying Vicmap vector data is [CC BY 4.0](https://www.data.vic.gov.au/copyright-datavic) via DataVic, and the official [Vicmap Basemaps](https://www.land.vic.gov.au/maps-and-spatial/data-services/vicmap-basemaps/licensing-and-copyright) service is a **paid licensed product** with annual subscription fees, the FFM Mapscape tile cache sits in a grey area:
 
-The current implementation renders a single shorter line listing every provider regardless of camera position; full per-provider attribution will need to expand into a tap-to-open dialog before Play submission.
+- No authentication, freely accessible
+- ArcGIS metadata has empty `copyrightText`
+- No published terms of use for this specific endpoint
+- Other apps (e.g. Handy GPS) use these tiles publicly
+- DEECA's [spatial data licensing page](https://www.deeca.vic.gov.au/maps/spatial-data/licensing) says "many (but not all)" datasets are CC BY 4.0
 
-### Outstanding ToS work before Play production
+**Action required:** email `vicmap@transport.vic.gov.au` and FFM Victoria asking whether the `mapscape_mercator` tiles may be consumed by a free open-source app, and under what licence.
 
-1. Email DEECA / Vicmap and Forest Fire Management Victoria asking whether the FFM-operated `emap.ffm.vic.gov.au` tile cache is covered by Vicmap's CC BY 4.0 stance, and confirm attribution wording.
-2. Email DataSA / DEW SA confirming the licence on `location.sa.gov.au` Topographic_wmas, and confirm app use is permitted.
-3. Email theLIST (DPIPWE) confirming licence and app use of `services.thelist.tas.gov.au` basemap tiles.
-4. If WA stays on OpenTopoMap, email Stefan Erhardt / OpenTopoMap describing AusTopo's caching, no-bulk-fetch, identifying-`User-Agent` posture, and ask for explicit blessing. (If declined, the WA fetcher should switch to Geoscience Australia — same licence as the NT fallback.)
+### SA — likely OK, email to confirm
 
-Replies should be filed under `docs/tos-correspondence/` (gitignored if they contain personal contact details).
+SA's [Open Data Principles](https://www.dpc.sa.gov.au/responsibilities/ict-digital-cyber-security/policies-and-guidelines/data/open-data-principles) specify CC BY 4.0 as the preferred licence (Principle 3) and explicitly contemplate APIs and web services (Principle 6). The [Location SA Viewer](https://location.sa.gov.au/viewer/) declares CC BY 4.0 in its footer. All Location SA datasets on [data.sa.gov.au](https://data.sa.gov.au/data/organization/location-sa) are listed under CC BY. SA government [gave explicit permission to OpenStreetMap](https://wiki.openstreetmap.org/wiki/Attribution/sa.data.gov.au_explicit_permission) for re-use of CC-BY data. However, the tile service endpoint itself has empty metadata fields and no explicit licence.
+
+**Action required:** email `locationsa@sa.gov.au` confirming CC BY 4.0 covers the REST tile endpoint for use in a free open-source app.
+
+### Required attribution strings
+
+Rendered in the bottom-right of the map view:
+
+- **NSW** — *© State of New South Wales (Spatial Services, a business unit of the Department of Customer Service NSW)*
+- **VIC** — *© State of Victoria (Department of Energy, Environment and Climate Action)* (pending confirmation)
+- **QLD** — *© State of Queensland*
+- **SA** — *© Government of South Australia*
+- **TAS** — *Topographic Basemap from theLIST © State of Tasmania* (per [LIST Data Attribution Guidelines](https://listdata.thelist.tas.gov.au/public/ILS%20Data%20Attribution%20Guidelines.pdf))
+- **GA** — *© Commonwealth of Australia (Geoscience Australia)*
+
+### Outstanding work before Play production
+
+1. **VIC (blocking):** Email `vicmap@transport.vic.gov.au` asking whether the FFM Mapscape tiles are available for use in a free open-source app and under what licence. If the answer is no or the licence requires fees, switch VIC to Geoscience Australia's national basemap (same as NT/WA).
+2. **SA (likely fine):** Email `locationsa@sa.gov.au` confirming CC BY 4.0 covers the tile REST endpoint.
+3. File replies under `docs/tos-correspondence/`.
