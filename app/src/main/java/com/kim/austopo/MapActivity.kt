@@ -163,10 +163,29 @@ class MapActivity : Activity(), LocationListener {
         loadSheets()
         syncNswIndexIfNeeded()
 
+        // Intent-driven camera: adb shell am start -n com.kim.austopo/.MapActivity
+        //   --ef lat -42.88 --ef lon 147.33 --ef zoom 2.0
+        applyIntentCamera()
+
         // GPS is opt-in: we don't request the permission on launch (which would
         // pop the OS dialog with no context, and breaches Play's prominent-
         // disclosure policy). Instead, the user invokes it via the Loc button,
         // which shows our own explanation first.
+    }
+
+    private fun hasIntentCamera(): Boolean =
+        !intent.getDoubleExtra("lat", Double.NaN).isNaN()
+
+    private fun applyIntentCamera() {
+        val lat = intent.getDoubleExtra("lat", Double.NaN)
+        val lon = intent.getDoubleExtra("lon", Double.NaN)
+        if (lat.isNaN() || lon.isNaN()) return
+        val (mx, my) = CoordinateConverter.wgs84ToWebMercator(lat, lon)
+        val zoom = intent.getFloatExtra("zoom", 0.1f)
+        mapView.camera.centerX = mx
+        mapView.camera.centerY = my
+        mapView.camera.zoom = zoom
+        mapView.invalidate()
     }
 
     private fun loadSheets() {
@@ -185,11 +204,14 @@ class MapActivity : Activity(), LocationListener {
             }
         }
 
-        // Set initial zoom if view is already laid out
-        if (mapView.width > 0) {
-            setInitialZoom()
-        } else {
-            mapView.post { setInitialZoom() }
+        // Set initial zoom if view is already laid out (skip if intent
+        // provides an explicit camera position)
+        if (!hasIntentCamera()) {
+            if (mapView.width > 0) {
+                setInitialZoom()
+            } else {
+                mapView.post { setInitialZoom() }
+            }
         }
     }
 

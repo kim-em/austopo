@@ -151,12 +151,14 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
         canvas: Canvas, camera: MapCamera,
         col: Int, row: Int, lod: Int
     ) {
-        // Try parent tiles (zoom-in case: upscale coarser tile into this slot)
+        // Try parent tiles (zoom-in case: upscale coarser tile into this slot).
+        // Uses getTile (not peekTile) so that parent tiles start loading if they
+        // aren't cached yet — avoids permanent grey on cold-start deep zoom.
         for (fallbackLod in (lod - 1) downTo tileFetcher.minLod) {
             val scale = lod - fallbackLod
             val parentCol = col shr scale
             val parentRow = row shr scale
-            val parentBitmap = tileFetcher.peekTile(fallbackLod, parentCol, parentRow) ?: continue
+            val parentBitmap = tileFetcher.getTile(fallbackLod, parentCol, parentRow) ?: continue
 
             val divisor = 1 shl scale
             val subCol = col - (parentCol shl scale)
