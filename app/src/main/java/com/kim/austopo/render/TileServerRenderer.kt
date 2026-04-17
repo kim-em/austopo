@@ -27,10 +27,8 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
     // Current LOD for hysteresis
     private var currentLod = -1
 
-    fun draw(canvas: Canvas, camera: MapCamera) {
+    fun draw(canvas: Canvas, camera: MapCamera, forceLod: Int = -1) {
         if (camera.viewWidth == 0 || camera.viewHeight == 0) return
-
-        val metersPerPixel = camera.metersPerPixel()
 
         val halfW = camera.halfViewW()
         val halfH = camera.halfViewH()
@@ -47,8 +45,12 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
             return
         }
 
-        // LOD with hysteresis to avoid threshold thrashing
-        val lod = tileFetcher.bestLodWithHysteresis(metersPerPixel, currentLod)
+        // Use the global LOD if provided, clamped to this fetcher's range
+        val lod = if (forceLod >= 0) {
+            forceLod.coerceIn(tileFetcher.minLod, tileFetcher.maxLod)
+        } else {
+            tileFetcher.bestLodWithHysteresis(camera.metersPerPixel(), currentLod)
+        }
         if (lod < tileFetcher.minLod) {
             tilesTotal = 0
             tilesLoaded = 0

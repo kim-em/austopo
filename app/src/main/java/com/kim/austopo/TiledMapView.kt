@@ -194,9 +194,14 @@ class TiledMapView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(Color.DKGRAY)
 
-        // Draw tile server imagery
+        // Draw tile server imagery. Compute LOD once so all renderers use
+        // the same LOD — per-renderer LOD selection causes ownership gaps
+        // when renderers pick different LODs via independent hysteresis.
+        val globalLod = if (tileServerRenderers.isNotEmpty()) {
+            tileServerRenderers[0].tileFetcher.bestLod(camera.metersPerPixel())
+        } else 0
         for (renderer in tileServerRenderers) {
-            renderer.draw(canvas, camera)
+            renderer.draw(canvas, camera, globalLod)
         }
 
         // Draw local sheet imagery
