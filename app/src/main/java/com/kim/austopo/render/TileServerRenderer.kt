@@ -251,6 +251,9 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
         canvas.drawBitmap(bitmap, src, dst, paint)
     }
 
+    /** Reset LOD hysteresis so a preference change takes effect immediately. */
+    fun resetLodSelection() { currentLod = -1 }
+
     fun recycle() {
         tileFetcher.recycle()
     }

@@ -33,11 +33,13 @@ class TileFetcher(
 ) {
 
     /**
-     * Extra LOD levels to add on top of what the camera zoom would normally
-     * select. +1 = show tiles at 2x the native detail (text appears twice
-     * as large). Set from user preferences; applies to all fetchers.
+     * Multiplier on metersPerPixel for LOD selection. Values < 1.0 select
+     * finer tiles (larger text); values > 1.0 select coarser tiles.
+     * Default 1.0 = match camera resolution exactly. A value of 0.5 shows
+     * tiles at 2x the native detail. Applied inside bestLod and
+     * bestLodWithHysteresis so it doesn't affect the scale bar or grid.
      */
-    var lodBias: Int = 0
+    var detailFactor: Double = 1.0
 
     /** Full URL for a single tile (ArcGIS REST cached tile service). */
     fun tileUrl(lod: Int, col: Int, row: Int): String = "$baseUrl/$lod/$row/$col"
@@ -215,37 +217,38 @@ class TileFetcher(
 
     /** Find the best LOD level for the current camera zoom (meters per pixel). */
     fun bestLod(metersPerPixel: Double): Int {
+        val effectiveMpp = metersPerPixel * detailFactor
         for (i in LOD_RESOLUTIONS.indices) {
-            if (LOD_RESOLUTIONS[i] <= metersPerPixel) {
-                return i.coerceAtMost(maxLod)
+            if (LOD_RESOLUTIONS[i] <= effectiveMpp) {
+                return i.coerceIn(minLod, maxLod)
             }
         }
-        return (LOD_RESOLUTIONS.size - 1).coerceAtMost(maxLod)
+        return maxLod
     }
 
     /**
      * Pick LOD with hysteresis: prefer staying on currentLod unless the ideal LOD
-     * is more than ~40% away from the current resolution. lodBias is applied
-     * AFTER hysteresis so it always takes effect regardless of zoom speed.
+     * is clearly past the threshold. Both bestLod and the hysteresis thresholds
+     * use the same detailFactor-adjusted metersPerPixel, so they cooperate.
      */
     fun bestLodWithHysteresis(metersPerPixel: Double, currentLod: Int): Int {
+        val effectiveMpp = metersPerPixel * detailFactor
         val ideal = bestLod(metersPerPixel)
-        // Apply hysteresis on the un-biased LOD
-        val unbiasCurrent = (currentLod - lodBias).coerceIn(minLod, maxLod)
-        val hysteresisResult = if (unbiasCurrent < 0) ideal
-        else if (ideal == unbiasCurrent) ideal
-        else {
-            val currentRes = LOD_RESOLUTIONS.getOrElse(unbiasCurrent) { return ideal }
-            val threshold = if (ideal > unbiasCurrent) {
-                currentRes * 0.4
-            } else {
-                currentRes * 2.5
-            }
-            if (ideal > unbiasCurrent && metersPerPixel < threshold) ideal
-            else if (ideal < unbiasCurrent && metersPerPixel > threshold) ideal
-            else unbiasCurrent
+        if (currentLod !in minLod..maxLod) return ideal
+        if (ideal == currentLod) return ideal
+        val currentRes = LOD_RESOLUTIONS[currentLod]
+        val threshold = if (ideal > currentLod) {
+            // Zooming in: switch when past 60% of the way to the next level
+            currentRes * 0.4
+        } else {
+            // Zooming out: switch when past 60% of the way back
+            currentRes * 2.5
         }
-        return (hysteresisResult + lodBias).coerceIn(minLod, maxLod)
+        return when {
+            ideal > currentLod && effectiveMpp < threshold -> ideal
+            ideal < currentLod && effectiveMpp > threshold -> ideal
+            else -> currentLod
+        }
     }
 
     /** Get resolution (meters/pixel) for a given LOD level. */

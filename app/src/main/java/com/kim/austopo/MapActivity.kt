@@ -121,7 +121,7 @@ class MapActivity : Activity(), LocationListener {
         }
 
         // Persisted prefs
-        applyLodBias(prefs.getInt("lod_bias", 0))
+        applyDetailFactor(prefs.getFloat("detail_factor", defaultDetailFactor()))
         mapView.showSheetRectangles = prefs.getBoolean("show_sheet_rectangles", false)
         mapView.showKmGrid = prefs.getBoolean("show_km_grid", false)
 
@@ -379,25 +379,26 @@ class MapActivity : Activity(), LocationListener {
 
     private fun actionMapScale() {
         val prefs = getSharedPreferences("austopo_sheets", MODE_PRIVATE)
-        val currentBias = prefs.getInt("lod_bias", 0)
-        val labels = arrayOf("Normal", "+1 (2x detail)", "+2 (4x detail)", "+3 (8x detail)")
+        // Slider 0..100 maps to detailFactor 1.0 .. 0.25 (lower = finer tiles)
+        val currentFactor = prefs.getFloat("detail_factor", defaultDetailFactor())
+        val currentProgress = factorToProgress(currentFactor)
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 32, 48, 16)
         }
         val label = TextView(this).apply {
-            text = labels[currentBias.coerceIn(0, labels.size - 1)]
+            text = formatFactor(currentFactor)
             textSize = 16f
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 16)
         }
         layout.addView(label)
         val seekBar = SeekBar(this).apply {
-            max = 3
-            progress = currentBias.coerceIn(0, 3)
+            max = 100
+            progress = currentProgress
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                    label.text = labels[progress]
+                    label.text = formatFactor(progressToFactor(progress))
                 }
                 override fun onStartTrackingTouch(sb: SeekBar) {}
                 override fun onStopTrackingTouch(sb: SeekBar) {}
@@ -408,18 +409,36 @@ class MapActivity : Activity(), LocationListener {
             .setTitle("Map Detail")
             .setView(layout)
             .setPositiveButton("OK") { _, _ ->
-                val bias = seekBar.progress
-                prefs.edit().putInt("lod_bias", bias).apply()
-                applyLodBias(bias)
+                val factor = progressToFactor(seekBar.progress)
+                prefs.edit().putFloat("detail_factor", factor).apply()
+                applyDetailFactor(factor)
                 mapView.invalidate()
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun applyLodBias(bias: Int) {
+    /** Slider 0 = 1.0 (normal), slider 100 = 0.25 (4x detail). */
+    private fun progressToFactor(progress: Int): Float =
+        (1.0f - progress / 100f * 0.75f)
+
+    private fun factorToProgress(factor: Float): Int =
+        ((1.0f - factor) / 0.75f * 100f).toInt().coerceIn(0, 100)
+
+    private fun formatFactor(factor: Float): String {
+        val mult = 1.0f / factor
+        return if (mult <= 1.05f) "Normal" else "%.1fx detail".format(mult)
+    }
+
+    private fun defaultDetailFactor(): Float {
+        val dpi = resources.displayMetrics.densityDpi
+        return (150f / dpi).coerceIn(0.25f, 1.0f)
+    }
+
+    private fun applyDetailFactor(factor: Float) {
         for (renderer in mapView.tileServerRenderers) {
-            renderer.tileFetcher.lodBias = bias
+            renderer.tileFetcher.detailFactor = factor.toDouble()
+            renderer.resetLodSelection()
         }
     }
 
