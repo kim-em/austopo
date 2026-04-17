@@ -73,11 +73,9 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
             minCol = mc; maxCol = mxc; minRow = mr; maxRow = mxr
             val count = (maxCol - minCol + 1) * (maxRow - minRow + 1)
             if (count <= 100) {
-                // Only apply ownership filtering at the target LOD. At fallback
-                // LODs (drawLod < lod), tiles are coarser and straddle borders —
-                // skipping them creates grey holes that no other renderer fills.
-                val applyOwnership = drawLod == lod
-                val result = drawGrid(canvas, camera, drawLod, minCol, maxCol, minRow, maxRow, applyOwnership)
+                Log.d("TileOwnership", "DRAW ${tileFetcher.stateId} drawLod=$drawLod targetLod=$lod cols=$minCol..$maxCol rows=$minRow..$maxRow count=$count")
+                // Draw at this LOD
+                val result = drawGrid(canvas, camera, drawLod, minCol, maxCol, minRow, maxRow)
                 tilesTotal = result.first
                 tilesLoaded = result.second
 
@@ -105,8 +103,7 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
 
     private fun drawGrid(
         canvas: Canvas, camera: MapCamera,
-        lod: Int, minCol: Int, maxCol: Int, minRow: Int, maxRow: Int,
-        applyOwnership: Boolean = true
+        lod: Int, minCol: Int, maxCol: Int, minRow: Int, maxRow: Int
     ): Pair<Int, Int> {
         var total = 0
         var loaded = 0
@@ -116,18 +113,24 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
 
         for (row in minRow..maxRow) {
             for (col in minCol..maxCol) {
-                // Check if this tile belongs to a different state.
-                // Only applied at the target LOD — at fallback (coarser) LODs,
-                // tiles are bigger and straddle borders; skipping them creates
-                // grey holes no other renderer fills.
-                val skip = if (applyOwnership && idx != null && myState.isNotEmpty()) {
+                // Check if this tile belongs to a different state
+                val skip = if (idx != null && myState.isNotEmpty()) {
                     val owner = idx.ownerForTile(lod, col, row)
                     owner != null && owner != myState
                 } else false
 
+                // Always fetch the tile (even if we won't draw it) so it's
+                // in our cache as a fallback parent for finer-LOD tiles
+                // that ARE in our state.
                 val bitmap = tileFetcher.getTile(lod, col, row)
 
-                if (skip) continue
+                if (skip) {
+                    Log.d("TileOwnership", "SKIP ${tileFetcher.stateId} lod=$lod col=$col row=$row owner=${idx?.ownerForTile(lod, col, row)}")
+                    continue
+                }
+                if (bitmap == null) {
+                    Log.d("TileOwnership", "NULL ${tileFetcher.stateId} lod=$lod col=$col row=$row owner=${idx?.ownerForTile(lod, col, row)}")
+                }
 
                 total++
                 if (bitmap != null) {
