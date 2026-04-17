@@ -121,6 +121,9 @@ class MapActivity : Activity(), LocationListener {
             renderer.boundaryIndex = boundaryIndex
             mapView.tileServerRenderers.add(renderer)
         }
+        // Let the boundary index know about all renderers so it can check
+        // which states can actually render a given tile.
+        boundaryIndex.renderers = mapView.tileServerRenderers.toList()
 
         // Persisted prefs
         mapView.showSheetRectangles = prefs.getBoolean("show_sheet_rectangles", false)

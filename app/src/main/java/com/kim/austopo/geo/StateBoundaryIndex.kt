@@ -2,6 +2,7 @@ package com.kim.austopo.geo
 
 import android.content.Context
 import com.kim.austopo.download.TileFetcher
+import com.kim.austopo.render.TileServerRenderer
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -60,13 +61,18 @@ class StateBoundaryIndex private constructor(
 
     /**
      * Priority list for border tiles (tiles whose corners fall in different
-     * states). The first state in this list that appears in the corner set
-     * wins. States not listed here fall back to the first corner match.
+     * states). The first state in this list that appears in the candidate set
+     * wins. States not listed here fall back to the first candidate.
      */
     private val borderPriority = listOf("VIC")
     // VIC > NSW: VIC Mapscape has full basemap coverage at the border,
     // while NSW shows VIC territory as blank white.
-    // Add other states here as needed, e.g. "TAS" if TAS > VIC at Bass Strait.
+
+    /**
+     * The renderers, set once at startup. Used to check which states can
+     * actually render a tile (their rectangular extent covers it).
+     */
+    var renderers: List<TileServerRenderer> = emptyList()
 
     /**
      * Which state owns this tile? Returns a state ID like "NSW", "VIC", etc.
@@ -74,7 +80,10 @@ class StateBoundaryIndex private constructor(
      *
      * - If all 4 corners agree: that state owns the tile.
      * - If corners disagree (border tile): the highest-priority state from
-     *   [borderPriority] that appears in the corner set wins.
+     *   [borderPriority] that can actually render the tile wins.
+     * - A state can only own a tile if its renderer's rectangular extent
+     *   covers the tile (otherwise the renderer would never enumerate it,
+     *   producing grey blocks).
      * - ACT is mapped to "NSW" since NSW's tile server covers it.
      */
     fun ownerForTile(lod: Int, col: Int, row: Int): String? {
@@ -90,12 +99,26 @@ class StateBoundaryIndex private constructor(
         )
         val present = corners.filterNotNull().toSet()
 
+        // Filter to only states that have a renderer whose extent covers
+        // this tile. A state that "owns" a tile but can't render it is
+        // useless — it would just produce a grey block.
+        val canRender = if (renderers.isNotEmpty()) {
+            present.filter { state ->
+                renderers.any { r ->
+                    r.tileFetcher.stateId == state &&
+                    bounds[2] > r.tileFetcher.extentMinX &&
+                    bounds[0] < r.tileFetcher.extentMaxX &&
+                    bounds[3] > r.tileFetcher.extentMinY &&
+                    bounds[1] < r.tileFetcher.extentMaxY
+                }
+            }.toSet()
+        } else present
+
         val owner = when {
-            present.isEmpty() -> null
-            present.size == 1 -> present.first()
+            canRender.isEmpty() -> null
+            canRender.size == 1 -> canRender.first()
             else -> {
-                // Border tile: pick by priority
-                borderPriority.firstOrNull { it in present } ?: present.first()
+                borderPriority.firstOrNull { it in canRender } ?: canRender.first()
             }
         }
         cache[key] = owner ?: ""
