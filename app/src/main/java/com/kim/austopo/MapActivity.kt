@@ -3,8 +3,6 @@ package com.kim.austopo
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.view.Menu
-import android.view.MenuItem
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -14,6 +12,8 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.PopupMenu
+import android.widget.TextView
 import android.widget.Toast
 import android.app.AlertDialog
 import android.app.Notification
@@ -57,10 +57,9 @@ class MapActivity : Activity(), LocationListener {
     private lateinit var offlineRegionStore: OfflineRegionStore
     private lateinit var offlineDownloader: OfflineRegionDownloader
     private lateinit var cacheCapEnforcer: CacheCapEnforcer
-    private lateinit var overlayToolbar: LinearLayout
+    private lateinit var titleBar: LinearLayout
+    private lateinit var hamburgerButton: Button
     private var toolbarVisible = true
-    private var toggleOverlayButton: Button? = null
-    private var toggleGridButton: Button? = null
 
     // Default center: roughly SE Australia
     private val defaultLat = -33.8
@@ -69,6 +68,16 @@ class MapActivity : Activity(), LocationListener {
     companion object {
         const val DEFAULT_CACHE_MAX_MB = 500
         private const val REQUEST_BOOKMARK_PICK = 101
+
+        // Hamburger menu item IDs
+        private const val MENU_LOCATION = 1
+        private const val MENU_BOOKMARKS = 2
+        private const val MENU_SAVE_OFFLINE = 3
+        private const val MENU_OFFLINE_REGIONS = 4
+        private const val MENU_CACHE = 5
+        private const val MENU_SYNC_NSW = 6
+        private const val MENU_SHEET_GRID = 7
+        private const val MENU_KM_GRID = 8
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,8 +134,8 @@ class MapActivity : Activity(), LocationListener {
 
         val layout = FrameLayout(this)
         layout.addView(mapView)
-        overlayToolbar = buildOverlayToolbar()
-        layout.addView(overlayToolbar, FrameLayout.LayoutParams(
+        titleBar = buildTitleBar()
+        layout.addView(titleBar, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.TOP
@@ -234,32 +243,7 @@ class MapActivity : Activity(), LocationListener {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, "My Location")
-        menu.add(0, 7, 0, "Bookmarks")
-        menu.add(0, 5, 0, "Save Offline")
-        menu.add(0, 6, 0, "Offline Regions")
-        menu.add(0, 2, 0, "Cache Management")
-        menu.add(0, 3, 0, "Sync NSW Index")
-        menu.add(0, 4, 0, if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid")
-        return true
-    }
 
-    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        menu.findItem(4)?.title = if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid"
-        return super.onPrepareOptionsMenu(menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        1 -> { actionMyLocation(); true }
-        2 -> { actionCacheManagement(); true }
-        3 -> { actionSyncNsw(); true }
-        4 -> { actionToggleOverlay(); true }
-        5 -> { actionSaveOffline(); true }
-        6 -> { actionOfflineRegions(); true }
-        7 -> { actionBookmarks(); true }
-        else -> super.onOptionsItemSelected(item)
-    }
 
     private fun actionMyLocation() {
         if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
@@ -307,7 +291,6 @@ class MapActivity : Activity(), LocationListener {
             .putBoolean("show_sheet_rectangles", mapView.showSheetRectangles)
             .apply()
         mapView.invalidate()
-        toggleOverlayButton?.text = overlayToggleLabel()
     }
 
     private fun actionToggleGrid() {
@@ -317,7 +300,6 @@ class MapActivity : Activity(), LocationListener {
             .putBoolean("show_km_grid", mapView.showKmGrid)
             .apply()
         mapView.invalidate()
-        toggleGridButton?.text = gridToggleLabel()
     }
 
     private fun actionSaveOffline() {
@@ -562,51 +544,73 @@ class MapActivity : Activity(), LocationListener {
         mapView.recycle()
     }
 
-    // --- Overlay toolbar ---
+    // --- Title bar + hamburger menu ---
 
-    private fun buildOverlayToolbar(): LinearLayout {
+    private fun buildTitleBar(): LinearLayout {
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(0xC0222222.toInt())  // translucent dark grey
-            setPadding(8, 8, 8, 8)
+            setBackgroundColor(0xC0222222.toInt())
+            setPadding(16, 12, 8, 12)
+            gravity = Gravity.CENTER_VERTICAL
         }
-        fun add(label: String, onTap: () -> Unit): Button {
-            val b = Button(this).apply {
-                text = label
-                textSize = 12f
-                minWidth = 0
-                minimumWidth = 0
-                setPadding(12, 8, 12, 8)
-                setOnClickListener { onTap() }
-            }
-            bar.addView(b, LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
-            ))
-            return b
+        val title = TextView(this).apply {
+            text = "AusTopo"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
         }
-        add("Loc") { actionMyLocation() }
-        add("Bkm") { actionBookmarks() }
-        add("Save") { actionSaveOffline() }
-        add("Rgns") { actionOfflineRegions() }
-        add("Cache") { actionCacheManagement() }
-        add("Sync") { actionSyncNsw() }
-        toggleOverlayButton = add(overlayToggleLabel()) { actionToggleOverlay() }
-        toggleGridButton = add(gridToggleLabel()) { actionToggleGrid() }
+        bar.addView(title, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+        ))
+        hamburgerButton = Button(this).apply {
+            text = "\u2630"   // ☰ trigram for heaven (hamburger icon)
+            textSize = 22f
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0x00000000)
+            minWidth = 0
+            minimumWidth = 0
+            setPadding(24, 4, 24, 4)
+            setOnClickListener { showMainMenu() }
+        }
+        bar.addView(hamburgerButton, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         return bar
     }
 
-    private fun overlayToggleLabel(): String =
-        if (::mapView.isInitialized && mapView.showSheetRectangles) "Hide" else "Show"
-
-    private fun gridToggleLabel(): String =
-        if (::mapView.isInitialized && mapView.showKmGrid) "Grid\u2713" else "Grid"
+    private fun showMainMenu() {
+        val popup = PopupMenu(this, hamburgerButton)
+        popup.menu.add(0, MENU_LOCATION, 0, "My Location")
+        popup.menu.add(0, MENU_BOOKMARKS, 1, "Bookmarks")
+        popup.menu.add(0, MENU_SAVE_OFFLINE, 2, "Save Offline")
+        popup.menu.add(0, MENU_OFFLINE_REGIONS, 3, "Offline Regions")
+        popup.menu.add(0, MENU_CACHE, 4, "Cache Management")
+        popup.menu.add(0, MENU_SYNC_NSW, 5, "Sync NSW Index")
+        popup.menu.add(0, MENU_SHEET_GRID, 6,
+            if (mapView.showSheetRectangles) "Hide Sheet Grid" else "Show Sheet Grid")
+        popup.menu.add(0, MENU_KM_GRID, 7,
+            if (mapView.showKmGrid) "Hide 1 km Grid" else "Show 1 km Grid")
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_LOCATION -> { actionMyLocation(); true }
+                MENU_BOOKMARKS -> { actionBookmarks(); true }
+                MENU_SAVE_OFFLINE -> { actionSaveOffline(); true }
+                MENU_OFFLINE_REGIONS -> { actionOfflineRegions(); true }
+                MENU_CACHE -> { actionCacheManagement(); true }
+                MENU_SYNC_NSW -> { actionSyncNsw(); true }
+                MENU_SHEET_GRID -> { actionToggleOverlay(); true }
+                MENU_KM_GRID -> { actionToggleGrid(); true }
+                else -> false
+            }
+        }
+        popup.show()
+    }
 
     private fun hideToolbar() {
         if (!toolbarVisible) return
         toolbarVisible = false
-        overlayToolbar.animate()
+        titleBar.animate()
             .alpha(0f)
-            .translationY(-overlayToolbar.height.toFloat())
+            .translationY(-titleBar.height.toFloat())
             .setDuration(150L)
             .start()
     }
@@ -614,7 +618,7 @@ class MapActivity : Activity(), LocationListener {
     private fun showToolbar() {
         if (toolbarVisible) return
         toolbarVisible = true
-        overlayToolbar.animate()
+        titleBar.animate()
             .alpha(1f)
             .translationY(0f)
             .setDuration(150L)

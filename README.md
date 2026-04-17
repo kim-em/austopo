@@ -71,7 +71,7 @@ For areas without a good tile server, or for offline-first use, the app can disp
 
 ## UI
 
-In-layout translucent overlay toolbar (no ActionBar): Loc, Bkm, Save, Rgns, Cache, Sync, Show/Hide sheets, Grid. Auto-hides on pan past the touch slop and restores on tap.
+Translucent title bar with "AusTopo" label and a hamburger menu. Tap the hamburger to access: My Location, Bookmarks, Save Offline, Offline Regions, Cache Management, Sync NSW Index, Show/Hide Sheet Grid, Show/Hide 1 km Grid. The title bar auto-hides on pan and restores on tap.
 
 ## Geodesy
 
