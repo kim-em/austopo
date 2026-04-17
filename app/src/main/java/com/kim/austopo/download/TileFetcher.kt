@@ -27,19 +27,8 @@ class TileFetcher(
     val extentMaxY: Double,
     val minLod: Int = 6,
     val maxLod: Int = 23,
-    cacheName: String = "tiles",
-    /** Contrast multiplier for tile rendering (1.0 = no change). */
-    val contrast: Float = 1.0f
+    cacheName: String = "tiles"
 ) {
-
-    /**
-     * Multiplier on metersPerPixel for LOD selection. Values < 1.0 select
-     * finer tiles (larger text); values > 1.0 select coarser tiles.
-     * Default 1.0 = match camera resolution exactly. A value of 0.5 shows
-     * tiles at 2x the native detail. Applied inside bestLod and
-     * bestLodWithHysteresis so it doesn't affect the scale bar or grid.
-     */
-    var detailFactor: Double = 1.0
 
     /** Full URL for a single tile (ArcGIS REST cached tile service). */
     fun tileUrl(lod: Int, col: Int, row: Int): String = "$baseUrl/$lod/$row/$col"
@@ -111,8 +100,7 @@ class TileFetcher(
             extentMinY = -4750000.0,   // ~-39.2°S
             extentMaxY = -4020000.0,   // ~-34°S
             maxLod = 23,
-            cacheName = "tiles_vic",
-            contrast = 1.3f   // faint at highest zooms
+            cacheName = "tiles_vic"
         )
 
         fun qld() = TileFetcher(
@@ -132,8 +120,7 @@ class TileFetcher(
             extentMinY = -4585000.0,   // ~-38°S
             extentMaxY = -2990000.0,   // ~-26°S
             maxLod = 20,
-            cacheName = "tiles_sa",
-            contrast = 1.4f   // thin lines, low contrast
+            cacheName = "tiles_sa"
         )
 
         fun tas() = TileFetcher(
@@ -143,8 +130,7 @@ class TileFetcher(
             extentMinY = -5432000.0,   // ~-43.7°S
             extentMaxY = -4800000.0,   // ~-39.6°S
             maxLod = 18,
-            cacheName = "tiles_tas",
-            contrast = 1.4f   // thin lines, low contrast
+            cacheName = "tiles_tas"
         )
 
         /**
@@ -243,11 +229,9 @@ class TileFetcher(
             // Zooming out: switch when past 60% of the way back
             currentRes * 2.5
         }
-        return when {
-            ideal > currentLod && metersPerPixel < threshold -> ideal
-            ideal < currentLod && metersPerPixel > threshold -> ideal
-            else -> currentLod
-        }
+        return if (ideal > currentLod && metersPerPixel < threshold) ideal
+        else if (ideal < currentLod && metersPerPixel > threshold) ideal
+        else currentLod
     }
 
     /** Get resolution (meters/pixel) for a given LOD level. */

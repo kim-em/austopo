@@ -11,18 +11,7 @@ import com.kim.austopo.download.TileFetcher
  */
 class TileServerRenderer(val tileFetcher: TileFetcher) {
 
-    private val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
-        if (tileFetcher.contrast != 1.0f) {
-            val c = tileFetcher.contrast
-            val t = 128f * (1f - c)  // translate to keep midpoint stable
-            colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
-                c, 0f, 0f, 0f, t,
-                0f, c, 0f, 0f, t,
-                0f, 0f, c, 0f, t,
-                0f, 0f, 0f, 1f, 0f
-            )))
-        }
-    }
+    private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
     // Loading state from last draw
     var tilesTotal = 0
@@ -53,11 +42,8 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
             return
         }
 
-        // LOD with hysteresis to avoid threshold thrashing.
-        // detailFactor is applied to metersPerPixel HERE (not inside the LOD
-        // functions) so the original hysteresis logic is undisturbed.
-        val effectiveMpp = metersPerPixel * tileFetcher.detailFactor
-        val lod = tileFetcher.bestLodWithHysteresis(effectiveMpp, currentLod)
+        // LOD with hysteresis to avoid threshold thrashing
+        val lod = tileFetcher.bestLodWithHysteresis(metersPerPixel, currentLod)
         if (lod < tileFetcher.minLod) {
             tilesTotal = 0
             tilesLoaded = 0
@@ -253,9 +239,6 @@ class TileServerRenderer(val tileFetcher: TileFetcher) {
         val dst = RectF(screenLeft, screenTop, screenRight, screenBottom)
         canvas.drawBitmap(bitmap, src, dst, paint)
     }
-
-    /** Reset LOD hysteresis so a preference change takes effect immediately. */
-    fun resetLodSelection() { currentLod = -1 }
 
     fun recycle() {
         tileFetcher.recycle()
